@@ -1,0 +1,87 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'ENV', choices: ['dev', 'test', 'uat', 'prod'], description: 'Target environment')
+        choice(name: 'ACTION', choices: ['terraform_apply', 'terraform_destroy', 'setup_gcp', 'decom_gcp'], description: 'Task to perform')
+    }
+
+    environment {
+        GCP_PROJECT_ID = "your-gcp-project-id"
+        GCP_REGION = "us-central1"
+        GCP_ARTIFACT_REPO = "my-etl-repo"
+        SERVICE_ACCOUNT_NAME = "etl-service-account"
+        GCP_CREDENTIALS_FILE = "/tmp/gcp-key.json"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Authenticate to GCP') {
+            steps {
+                withCredentials([file(credentialsId: 'gcp-service-account-key', variable: 'GCP_KEY')]) {
+                    sh 'cp $GCP_KEY $GCP_CREDENTIALS_FILE'
+                    sh "gcloud auth activate-service-account --key-file=$GCP_CREDENTIALS_FILE"
+                }
+            }
+        }
+
+        stage('Terraform') {
+            when {
+                expression { params.ACTION == 'terraform_apply' || params.ACTION == 'terraform_destroy' }
+            }
+            steps {
+                dir("terraform/envs/${params.ENV}") {
+                    sh 'terraform init'
+                    script {
+                        if (params.ACTION == 'terraform_apply') {
+                            sh 'terraform apply -auto-approve'
+                        } else if (params.ACTION == 'terraform_destroy') {
+                            sh 'terraform destroy -auto-approve'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Setup GCP Resources (Ansible)') {
+            when { expression { params.ACTION == 'setup_gcp' } }
+            steps {
+                sh """
+                docker run --rm -v \$(pwd)/ansible:/ansible -v \$(pwd)/env:/env \\
+                -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \\
+                -e GCP_REGION=${GCP_REGION} \\
+                -e GCP_ARTIFACT_REPO=${GCP_ARTIFACT_REPO} \\
+                -e SERVICE_ACCOUNT_NAME=${SERVICE_ACCOUNT_NAME} \\
+                -e ENV=${params.ENV} \\
+                ansible_image:latest ansible-playbook /ansible/playbook/setup_gcp_resources.yml
+                """
+            }
+        }
+
+        stage('Decommission GCP Resources (Ansible)') {
+            when { expression { params.ACTION == 'decom_gcp' } }
+            steps {
+                sh """
+                docker run --rm -v \$(pwd)/ansible:/ansible -v \$(pwd)/env:/env \\
+                -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \\
+                -e GCP_REGION=${GCP_REGION} \\
+                -e GCP_ARTIFACT_REPO=${GCP_ARTIFACT_REPO} \\
+                -e SERVICE_ACCOUNT_NAME=${SERVICE_ACCOUNT_NAME} \\
+                -e ENV=${params.ENV} \\
+                ansible_image:latest ansible-playbook /ansible/playbook/decom_gcp_resources.yml
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'rm -f $GCP_CREDENTIALS_FILE'
+        }
+    }
+}

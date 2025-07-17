@@ -65,6 +65,9 @@ RUN curl -sSL https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark
     # Remove unnecessary files to reduce size
     rm -rf ${SPARK_HOME}/examples ${SPARK_HOME}/data ${SPARK_HOME}/R ${SPARK_HOME}/yarn
 
+# Add log4j.properties file
+COPY config/log4j.properties ${SPARK_HOME}/conf/log4j.properties
+
 # Install Python dependencies
 WORKDIR /install
 COPY requirements/prod.txt .

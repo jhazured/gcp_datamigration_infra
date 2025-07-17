@@ -57,7 +57,6 @@ gcp_datamigration_infra/
         ├── compute_instance/
         └── network/
 
-
 ## Prerequisites
     - Jenkins with Docker and GCP CLI installed.
     - Google Cloud project with necessary APIs enabled:
@@ -102,9 +101,9 @@ The pipeline consists of four main actions that work together to manage your GCP
 
 ### How These Actions Work Together
 
-1. **terraform_apply** runs first to create the base infrastructure required by your application.
-2. **setup_gcp** follows to configure and provision additional resources and secrets that Terraform does not manage.
-3. When decommissioning, **decom_gcp** runs first to safely remove resources managed by Ansible.
+1. **terraform_apply** runs first to create the base infrastructure required by your application.  
+2. **setup_gcp** follows to configure and provision additional resources and secrets that Terraform does not manage.  
+3. When decommissioning, **decom_gcp** runs first to safely remove resources managed by Ansible.  
 4. Finally, **terraform_destroy** cleans up the remaining core infrastructure managed by Terraform.
 
 This sequence ensures a clean, reliable, and automated lifecycle for your GCP infrastructure, with Terraform handling declarative resource provisioning and Ansible managing procedural orchestration and configuration.

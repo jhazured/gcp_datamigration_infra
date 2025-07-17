@@ -78,7 +78,17 @@ pipeline {
             }
         }
     }
-
+    // Helper functions for different actions
+    def executeBuildImage(extraArgs, dryRunFlag) {
+        echo "Building and pushing Docker image..."
+        sh """
+            echo "Building Docker image for environment: ${params.ENV}"
+            timeout ${env.SCRIPT_TIMEOUT} ./scripts/tasks.sh build ${params.ENV}${extraArgs}${dryRunFlag}
+            
+            echo "Pushing Docker image for environment: ${params.ENV}"
+            timeout ${env.SCRIPT_TIMEOUT} ./scripts/tasks.sh push ${params.ENV}${extraArgs}${dryRunFlag}
+        """
+    }
     post {
         always {
             sh 'rm -f $GCP_CREDENTIALS_FILE'

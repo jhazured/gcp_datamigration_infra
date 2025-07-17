@@ -27,16 +27,21 @@ gcp_datamigration_infra/
 │   ├── playbook/
 │   │   ├── build_push_image.yml
 │   │   ├── decom_gcp_resources.yml
+│   │   ├── deploy.yml
+│   │   ├── deploy_infra.yml
+│   │   ├── deploy_jenkins.yml
 │   │   └── setup_gcp_resources.yml
 │   ├── roles/
 │   └── templates/
 │       └── .env.j2
 ├── docker/
-│   └── Dockerfile.ansible
+│   ├── Dockerfile.ansible
+│   ├── Dockerfile.jenkins
+│   └── Dockerfile.ubuntu
 ├── env/
 ├── jenkins/
-│   ├── Jenkinsfile
-│   └── Jenkinsfile.ansible
+│   ├── Jenkinsfile.docker
+│   └── Jenkinsfile.infra
 ├── scripts/
 │   ├── delete_etl.sh
 │   └── tasks.sh
@@ -68,17 +73,19 @@ gcp_datamigration_infra/
     - Jenkins credentials configured to securely store the Service Account JSON key.
 
 ## Setup Instructions
-    1. Configure Jenkins
+    1. Configure Jenkins.
     2. Add your GCP Service Account JSON key as a Secret file credential in Jenkins with an ID (e.g., gcp-service-account-key).
-    3. Create a Jenkins pipeline job using the jenkins/Jenkinsfile.
-    4. Set pipeline parameters (ENV, ACTION) on job trigger.
+    3. Create Jenkins pipeline jobs using the appropriate Jenkinsfiles:
+    4. jenkins/Jenkinsfile.infra for infrastructure provisioning.
+    5. jenkins/Jenkinsfile.docker for Docker image build and push.
+    6. Set pipeline parameters (ENV, ACTION) on job trigger.
 
 ## Terraform
     1. Customize Terraform variables per environment under terraform/envs/<env>/.
     2. Terraform manages declarative provisioning and teardown of core infrastructure.
 
 ## Ansible
-    1. Run setup_gcp_resources.yml to provision Artifact Registry, Service Accounts, IAM roles, and more.
+    1. Run setup_gcp_resources.yml to provision Artifact Registry, Service Accounts, IAM roles, and other resources.
     2. Run decom_gcp_resources.yml to decommission resources cleanly.
     3. Ansible runs inside the Docker container defined by docker/Dockerfile.ansible.
 

@@ -1,20 +1,72 @@
-- name: Build and Push Docker Image
+- name: Build & push Docker images to GCP Artifact Registry
   hosts: localhost
-  gather_facts: false
+  gather_facts: no
+  vars:
+    env: "{{ env }}"
+    gcp_project_id: "{{ gcp_project_id }}"
+    gcp_region: "{{ gcp_region }}"
+    gcp_artifact_repo: "{{ gcp_artifact_repo }}"
+    docker_images:
+      - name: "ubuntu-etl"
+        dockerfile: "docker/Dockerfile.ubuntu"
+      - name: "jenkins-etl"
+        dockerfile: "docker/Dockerfile.jenkins"
+      - name: "ansible-etl"
+        dockerfile: "docker/Dockerfile.ansible"
+    image_tag: "{{ docker_tag }}"
+    target_image: "{{ target_image | default('all') }}"  # pass this variable to specify
+
   tasks:
+    - name: Retrieve GCP credentials from Secret Manager
+      gcp_secret_manager_secret:
+        project_id: "{{ gcp_project_id }}"
+        secret_id: "{{ gcp_credentials_secret_name }}"
+        version: "latest"
+      register: gcp_credentials_secret
+      no_log: true
+
+    - name: Write GCP credentials to file
+      copy:
+        dest: "/tmp/gcp_creds.json"
+        content: "{{ gcp_credentials_secret.secret_data }}"
+      no_log: true
+
     - name: Authenticate Docker with GCP Artifact Registry
-      shell: |
+      command: >
         gcloud auth configure-docker {{ gcp_region }}-docker.pkg.dev --quiet
+      environment:
+        GOOGLE_APPLICATION_CREDENTIALS: "/tmp/gcp_creds.json"
 
-    - name: Build Docker image
-      shell: |
-        docker build -t {{ docker_image_name }}:{{ docker_tag }} -f docker/Dockerfile.ubuntu .
+    - name: Select images to build and push
+      set_fact:
+        images_to_process: >-
+          {{
+            docker_images if target_image == 'all' 
+            else docker_images | selectattr('name', 'equalto', target_image) | list
+          }}
 
-    - name: Tag Docker image
-      shell: |
-        docker tag {{ docker_image_name }}:{{ docker_tag }} \
-          {{ docker_repo }}/{{ docker_image_name }}:{{ docker_tag }}
+    - name: Build Docker images
+      community.general.docker_image:
+        name: "{{ item.name }}"
+        tag: "{{ image_tag }}"
+        build:
+          path: "{{ playbook_dir }}/../.."
+          dockerfile: "{{ item.dockerfile }}"
+          pull: yes
+          nocache: yes
+      loop: "{{ images_to_process }}"
 
-    - name: Push Docker image
-      shell: |
-        docker push {{ docker_repo }}/{{ docker_image_name }}:{{ docker_tag }}
+    - name: Tag Docker images for GCP Artifact Registry
+      command: >
+        docker tag {{ item.name }}:{{ image_tag }} {{ gcp_region }}-docker.pkg.dev/{{ gcp_project_id }}/{{ gcp_artifact_repo }}/{{ item.name }}:{{ image_tag }}
+      loop: "{{ images_to_process }}"
+
+    - name: Push Docker images to GCP Artifact Registry
+      command: >
+        docker push {{ gcp_region }}-docker.pkg.dev/{{ gcp_project_id }}/{{ gcp_artifact_repo }}/{{ item.name }}:{{ image_tag }}
+      loop: "{{ images_to_process }}"
+
+    - name: Clean up GCP credentials file
+      file:
+        path: "/tmp/gcp_creds.json"
+        state: absent

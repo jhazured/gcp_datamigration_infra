@@ -24,3 +24,27 @@
       shell: |
         gcloud secrets delete {{ gcp_credentials_secret_name }} --quiet --project={{ gcp_project_id }}
       ignore_errors: true
+
+    - name: Remove local Ubuntu ETL Docker image
+      community.docker.docker_image:
+        name: ubuntu-etl
+        tag: latest
+        state: absent
+
+    - name: Remove local Jenkins Docker image
+      community.docker.docker_image:
+        name: jenkins-etl
+        tag: latest
+        state: absent
+
+    - name: Remove local Ansible Docker image
+      community.docker.docker_image:
+        name: ansible-etl
+        tag: latest
+        state: absent
+
+    - name: Delete Docker image from GCP Artifact Registry
+      command: >
+        gcloud artifacts docker images delete
+        {{ gcp_region }}-docker.pkg.dev/{{ gcp_project_id }}/{{ gcp_artifact_repo }}/{{ image_name }}:{{ image_tag }}
+        --quiet

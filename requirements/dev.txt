@@ -3,4 +3,3 @@ black==23.7.0
 flake8==6.0.0
 mypy==1.5.1
 ipython==8.15.0
-pytest==7.4.0

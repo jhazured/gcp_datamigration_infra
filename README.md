@@ -17,6 +17,7 @@ Infrastructure automation project for provisioning and managing Google Cloud Pla
 
 ## Project Structure
 
+```plaintext
 gcp_datamigration_infra/
 ├── README.md
 ├── ansible/

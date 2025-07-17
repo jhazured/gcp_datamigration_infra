@@ -1,0 +1,41 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'ENV', choices: ['dev', 'test', 'uat', 'prod'], description: 'Select environment')
+        choice(name: 'ACTION', choices: ['build_image', 'push_image', 'delete_image'], description: 'Docker action to perform')
+    }
+
+    environment {
+        SCRIPT_TIMEOUT = '10m'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            when { expression { params.ACTION == 'build_image' } }
+            steps {
+                sh "./scripts/tasks.sh build ${params.ENV}"
+            }
+        }
+
+        stage('Push Docker Image') {
+            when { expression { params.ACTION == 'push_image' } }
+            steps {
+                sh "./scripts/tasks.sh push ${params.ENV}"
+            }
+        }
+
+        stage('Delete Docker Image') {
+            when { expression { params.ACTION == 'delete_image' } }
+            steps {
+                sh "./scripts/delete_etl.sh ${params.ENV}"
+            }
+        }
+    }
+}

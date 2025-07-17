@@ -1,56 +1,20 @@
-- name: Build & push Docker image to GCP Artifact Registry
+- name: Build and Push Docker Image
   hosts: localhost
-  gather_facts: no
-  vars:
-    env: "{{ env }}"
-    image_name: "{{ docker_image_name }}"
-    image_tag: "{{ docker_tag }}"
-    full_image_name: "{{ gcp_region }}-docker.pkg.dev/{{ gcp_project_id }}/{{ gcp_artifact_repo }}/{{ image_name }}:{{ image_tag }}"
-
+  gather_facts: false
   tasks:
-    - name: Retrieve GCP credentials from Secret Manager
-      gcp_secret_manager_secret:
-        project_id: "{{ gcp_project_id }}"
-        secret_id: "{{ gcp_credentials_secret_name }}"
-        version: "latest"
-      register: gcp_credentials_secret
-      no_log: true
-
-    - name: Write GCP creds to file
-      copy:
-        dest: "/tmp/gcp_creds.json"
-        content: "{{ gcp_credentials_secret.secret_data }}"
-      no_log: true
-
-    - name: Generate .env file from template
-      template:
-        src: ansible/templates/.env.j2
-        dest: "/tmp/.env.{{ env }}"
+    - name: Authenticate Docker with GCP Artifact Registry
+      shell: |
+        gcloud auth configure-docker {{ gcp_region }}-docker.pkg.dev --quiet
 
     - name: Build Docker image
-      community.general.docker_image:
-        name: "{{ image_name }}"
-        tag: "{{ image_tag }}"
-        build:
-          path: "{{ playbook_dir }}/../.."
-          dockerfile: "docker/Dockerfile.ansible"
-          pull: yes
-          nocache: yes
-          args:
-            ENV_FILE: "/tmp/.env.{{ env }}"
+      shell: |
+        docker build -t {{ docker_image_name }}:{{ docker_tag }} -f docker/Dockerfile.ubuntu .
 
     - name: Tag Docker image
-      command: >
-        docker tag {{ image_name }}:{{ image_tag }} {{ full_image_name }}
+      shell: |
+        docker tag {{ docker_image_name }}:{{ docker_tag }} \
+          {{ docker_repo }}/{{ docker_image_name }}:{{ docker_tag }}
 
-    - name: Push Docker image to GCP Artifact Registry
-      command: >
-        docker push {{ full_image_name }}
-
-    - name: Clean up temp files
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "/tmp/.env.{{ env }}"
-        - "/tmp/gcp_creds.json"
+    - name: Push Docker image
+      shell: |
+        docker push {{ docker_repo }}/{{ docker_image_name }}:{{ docker_tag }}

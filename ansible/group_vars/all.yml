@@ -1,0 +1,13 @@
+env: dev
+
+gcp_project_id: your-gcp-project-id
+gcp_region: asia-southeast1
+gcp_artifact_repo: my-etl-artifacts
+gcs_bucket_name: my-etl-bucket-dev
+gcp_credentials_secret_name: etl-env-secret
+service_account_name: etl-service-account
+
+docker_image_name: etl_runner
+docker_tag: dev
+docker_repo: asia-southeast1-docker.pkg.dev/your-gcp-project-id/my-etl-artifacts
+

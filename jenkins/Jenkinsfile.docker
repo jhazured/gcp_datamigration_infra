@@ -7,7 +7,13 @@ pipeline {
     }
 
     environment {
-        SCRIPT_TIMEOUT = '10m'
+        SCRIPT_TIMEOUT = '20m'
+        DOCKER_REGISTRY = "gcr.io/your-gcp-project-id"  // Update this with your actual project ID
+        IMAGE_BASE_NAME = "etl_image"
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
     }
 
     stages {
@@ -20,22 +26,57 @@ pipeline {
         stage('Build Docker Image') {
             when { expression { params.ACTION == 'build_image' } }
             steps {
-                sh "./scripts/tasks.sh build ${params.ENV}"
+                timeout(time: 15, unit: 'MINUTES') {
+                    script {
+                        def imageTag = "${params.ENV}-${env.BUILD_NUMBER}"
+                        def fullImageName = "${env.DOCKER_REGISTRY}/${env.IMAGE_BASE_NAME}:${imageTag}"
+                        sh """
+                            ./scripts/tasks.sh build ${params.ENV} ${fullImageName}
+                        """
+                    }
+                }
             }
         }
 
         stage('Push Docker Image') {
             when { expression { params.ACTION == 'push_image' } }
             steps {
-                sh "./scripts/tasks.sh push ${params.ENV}"
+                timeout(time: 15, unit: 'MINUTES') {
+                    script {
+                        def imageTag = "${params.ENV}-${env.BUILD_NUMBER}"
+                        def fullImageName = "${env.DOCKER_REGISTRY}/${env.IMAGE_BASE_NAME}:${imageTag}"
+                        sh """
+                            ./scripts/tasks.sh push ${fullImageName}
+                        """
+                    }
+                }
             }
         }
 
         stage('Delete Docker Image') {
             when { expression { params.ACTION == 'delete_image' } }
             steps {
-                sh "./scripts/delete_etl.sh ${params.ENV}"
+                timeout(time: 10, unit: 'MINUTES') {
+                    script {
+                        def imageTag = "${params.ENV}-${env.BUILD_NUMBER}"
+                        def fullImageName = "${env.DOCKER_REGISTRY}/${env.IMAGE_BASE_NAME}:${imageTag}"
+                        sh """
+                            ./scripts/delete_etl.sh ${fullImageName}
+                        """
+                    }
+                }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Docker pipeline succeeded."
+            // Add notification steps here
+        }
+        failure {
+            echo "Docker pipeline failed."
+            // Add failure notifications here
         }
     }
 }

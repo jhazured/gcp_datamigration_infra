@@ -2,6 +2,7 @@
 
 # ETL Project Task Runner for GCP
 # Usage: ./run_tasks.sh [task] [options]
+# For build and deploy tasks, you can pass an optional full image tag as 2nd argument
 
 set -e  # Exit on any error
 
@@ -41,7 +42,7 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to check prerequisites
+# Check prerequisites function
 check_prerequisites() {
     print_status "Checking prerequisites..."
     
@@ -55,7 +56,6 @@ check_prerequisites() {
         exit 1
     fi
     
-    # Check if authenticated with gcloud
     if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q .; then
         print_error "Not authenticated with gcloud. Run 'gcloud auth login'"
         exit 1
@@ -64,222 +64,113 @@ check_prerequisites() {
     print_success "Prerequisites check passed"
 }
 
-# Function to setup Python environment
-setup_python_env() {
-    print_status "Setting up Python environment..."
-    
-    if [ ! -d "venv" ]; then
-        print_status "Creating virtual environment..."
-        python3 -m venv venv
-    fi
-    
-    source venv/bin/activate
-    
-    # Install development dependencies
-    if [ -f "requirements/dev.txt" ]; then
-        print_status "Installing development dependencies..."
-        pip install -r requirements/dev.txt
-    elif [ -f "requirements.txt" ]; then
-        print_status "Installing dependencies from requirements.txt..."
-        pip install -r requirements.txt
-    else
-        print_warning "No requirements file found. Installing basic dependencies..."
-        pip install pytest pytest-cov pytest-html
-    fi
-    
-    print_success "Python environment setup complete"
-}
-
-# Function to run linting (basic setup)
-run_linting() {
-    print_status "Running code linting..."
-    
-    source venv/bin/activate
-    
-    # Install basic linting tools if not present
-    if ! pip show flake8 >/dev/null 2>&1; then
-        pip install flake8 black isort --quiet
-    fi
-    
-    print_status "Running black (code formatter)..."
-    black --check . || {
-        print_warning "Code formatting issues found. Run 'black .' to fix"
-    }
-    
-    print_status "Running isort (import sorting)..."
-    isort --check-only . || {
-        print_warning "Import sorting issues found. Run 'isort .' to fix"
-    }
-    
-    print_status "Running flake8 (linting)..."
-    flake8 . || {
-        print_warning "Linting issues found"
-    }
-    
-    print_success "Linting complete"
-}
-
-# Function to run tests
-run_tests() {
-    print_status "Running tests..."
-    ./run_pytest.sh
-    print_success "Tests completed"
-}
-
-# Function to build Docker images
+# Build Docker images (optionally with full tag)
 build_docker_images() {
-    print_status "Building Docker images..."
+    local image_tag="${1:-latest}"
+    print_status "Building Docker images with tag: $image_tag"
     
-    # Build Ubuntu ETL image with production requirements
+    # Ubuntu image
     if [ -f "docker/Dockerfile.ubuntu" ]; then
         print_status "Building Ubuntu ETL image..."
         if [ -f "requirements/prod.txt" ]; then
-            docker build --platform=linux/amd64 -t ${UBUNTU_IMAGE}:latest \
+            docker build --platform=linux/amd64 -t ${UBUNTU_IMAGE}:${image_tag} \
                 --build-arg REQUIREMENTS_FILE=requirements/prod.txt \
                 -f docker/Dockerfile.ubuntu .
         else
-            docker build --platform=linux/amd64 -t ${UBUNTU_IMAGE}:latest -f docker/Dockerfile.ubuntu .
+            docker build --platform=linux/amd64 -t ${UBUNTU_IMAGE}:${image_tag} -f docker/Dockerfile.ubuntu .
         fi
         print_success "Ubuntu image built successfully"
     fi
     
-    # Build Jenkins image
+    # Jenkins image
     if [ -f "docker/Dockerfile.jenkins" ]; then
         print_status "Building Jenkins image..."
-        docker build --platform=linux/amd64 -t ${JENKINS_IMAGE}:latest -f docker/Dockerfile.jenkins .
+        docker build --platform=linux/amd64 -t ${JENKINS_IMAGE}:${image_tag} -f docker/Dockerfile.jenkins .
         print_success "Jenkins image built successfully"
     fi
     
-    # Build Ansible image
+    # Ansible image
     if [ -f "docker/Dockerfile.ansible" ]; then
         print_status "Building Ansible image..."
-        docker build --platform=linux/amd64 -t ${ANSIBLE_IMAGE}:latest -f docker/Dockerfile.ansible .
+        docker build --platform=linux/amd64 -t ${ANSIBLE_IMAGE}:${image_tag} -f docker/Dockerfile.ansible .
         print_success "Ansible image built successfully"
     fi
-    
-    print_success "All Docker images built successfully"
+
+    print_success "All Docker images built with tag: $image_tag"
 }
 
-# Function to tag and push images to GCP
+# Deploy Docker images (optionally with full tag)
 deploy_to_gcp() {
-    print_status "Deploying images to GCP Container Registry..."
+    local image_tag="${1:-latest}"
+    print_status "Deploying images to GCP Container Registry with tag: $image_tag"
     
-    # Configure Docker for GCP
     gcloud auth configure-docker --quiet
     
-    # Tag and push Ubuntu image
-    if docker image inspect ${UBUNTU_IMAGE}:latest >/dev/null 2>&1; then
-        docker tag ${UBUNTU_IMAGE}:latest ${DOCKER_REGISTRY}/${UBUNTU_IMAGE}:latest
-        docker push ${DOCKER_REGISTRY}/${UBUNTU_IMAGE}:latest
-        print_success "Ubuntu image pushed to GCP"
-    else
-        print_warning "Skipping Ubuntu image push: image not found"
-    fi
+    # Helper to tag and push an image if it exists
+    push_image_if_exists() {
+        local local_image="$1"
+        local full_image="$2"
+        
+        if docker image inspect ${local_image} >/dev/null 2>&1; then
+            docker tag ${local_image} ${full_image}
+            docker push ${full_image}
+            print_success "Pushed image: ${full_image}"
+        else
+            print_warning "Skipping push: image ${local_image} not found"
+        fi
+    }
     
-    # Tag and push Jenkins image
-    if docker image inspect ${JENKINS_IMAGE}:latest >/dev/null 2>&1; then
-        docker tag ${JENKINS_IMAGE}:latest ${DOCKER_REGISTRY}/${JENKINS_IMAGE}:latest
-        docker push ${DOCKER_REGISTRY}/${JENKINS_IMAGE}:latest
-        print_success "Jenkins image pushed to GCP"
-    else
-        print_warning "Skipping Jenkins image push: image not found"
-    fi
+    push_image_if_exists "${UBUNTU_IMAGE}:${image_tag}" "${DOCKER_REGISTRY}/${UBUNTU_IMAGE}:${image_tag}"
+    push_image_if_exists "${JENKINS_IMAGE}:${image_tag}" "${DOCKER_REGISTRY}/${JENKINS_IMAGE}:${image_tag}"
+    push_image_if_exists "${ANSIBLE_IMAGE}:${image_tag}" "${DOCKER_REGISTRY}/${ANSIBLE_IMAGE}:${image_tag}"
     
-    # Tag and push Ansible image
-    if docker image inspect ${ANSIBLE_IMAGE}:latest >/dev/null 2>&1; then
-        docker tag ${ANSIBLE_IMAGE}:latest ${DOCKER_REGISTRY}/${ANSIBLE_IMAGE}:latest
-        docker push ${DOCKER_REGISTRY}/${ANSIBLE_IMAGE}:latest
-        print_success "Ansible image pushed to GCP"
-    else
-        print_warning "Skipping Ansible image push: image not found"
-    fi
-    
-    print_success "All images deployed to GCP successfully"
+    print_success "All images deployed to GCP with tag: $image_tag"
 }
 
-# Function to run full CI/CD pipeline
-run_full_pipeline() {
-    print_status "Running full CI/CD pipeline..."
-    check_prerequisites
-    setup_python_env
-    run_linting
-    run_tests
-    build_docker_images
-    deploy_to_gcp
-    print_success "Full pipeline completed successfully"
-}
-
-# Function to clean up
+# Clean up function (remove dangling images, pycache)
 cleanup() {
     print_status "Cleaning up..."
     
-    # Remove dangling Docker images
     docker image prune -f
     
-    # Clean Python cache
     find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     find . -type f -name "*.pyc" -delete 2>/dev/null || true
     
     print_success "Cleanup completed"
 }
 
-# Function to show help
+# Help message
 show_help() {
     echo "ETL Project Task Runner"
     echo ""
-    echo "Usage: ./run_tasks.sh [TASK] [OPTIONS]"
+    echo "Usage: ./run_tasks.sh [TASK] [OPTIONAL_IMAGE_TAG]"
     echo ""
-    echo "=== PRODUCTION/CI-CD TASKS ==="
-    echo "  setup           - Setup Python environment"
-    echo "  lint            - Run code linting and formatting checks"
-    echo "  test            - Run pytest tests"
-    echo "  build           - Build all Docker images (ubuntu, jenkins, ansible)"
-    echo "  deploy          - Deploy images to GCP Container Registry"
-    echo "  pipeline        - Run full CI/CD pipeline"
+    echo "Tasks:"
+    echo "  build [tag]       Build Docker images with optional tag (default: latest)"
+    echo "  deploy [tag]      Push Docker images with optional tag (default: latest)"
+    echo "  cleanup           Cleanup dangling images and python caches"
+    echo "  help              Show this help message"
     echo ""
-    echo "=== UTILITY TASKS ==="
-    echo "  cleanup         - Clean up temporary files and Docker images"
-    echo "  help            - Show this help message"
-    echo ""
-    echo "Production deployment:"
-    echo "  ./run_tasks.sh pipeline          # Full CI/CD pipeline"
-    echo ""
-    echo "Note: DOCKER_REGISTRY is auto-detected via 'gcloud config get-value project'"
+    echo "Example:"
+    echo "  ./run_tasks.sh build prod-42"
+    echo "  ./run_tasks.sh deploy prod-42"
 }
 
-# Main script logic
+# Main logic
 case "${1:-help}" in
-    setup)
-        setup_python_env
-        ;;
-    lint)
-        setup_python_env
-        run_linting
-        ;;
-    test)
-        setup_python_env
-        run_tests
-        ;;
     build)
         check_prerequisites
-        build_docker_images
+        build_docker_images "$2"
         ;;
     deploy)
         check_prerequisites
-        deploy_to_gcp
-        ;;
-    pipeline)
-        run_full_pipeline
+        deploy_to_gcp "$2"
         ;;
     cleanup)
         cleanup
         ;;
-    help)
+    help|*)
         show_help
-        ;;
-    *)
-        print_error "Unknown task: $1"
-        show_help
-        exit 1
+        exit 0
         ;;
 esac

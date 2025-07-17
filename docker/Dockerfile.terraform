@@ -1,0 +1,19 @@
+# Use official HashiCorp Terraform image as base
+FROM hashicorp/terraform:1.5.7
+
+# Optional: Install common tools useful in Terraform workflows
+RUN apk add --no-cache \
+    bash \
+    git \
+    openssh \
+    curl \
+    jq
+
+# Set working directory inside container
+WORKDIR /workspace
+
+# Entrypoint to run terraform commands by default
+ENTRYPOINT ["terraform"]
+
+# By default, show terraform version if no arguments passed
+CMD ["version"]

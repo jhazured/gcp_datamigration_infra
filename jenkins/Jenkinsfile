@@ -1,0 +1,177 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'ENV', choices: ['dev', 'test', 'uat', 'prod'], description: 'Target environment')
+        choice(name: 'ACTION', choices: [
+            'terraform_apply', 'terraform_destroy',
+            'setup_gcp', 'decom_gcp',
+            'build_images', 'push_images', 'delete_images'
+        ], description: 'Action to perform')
+    }
+
+    environment {
+        GCP_PROJECT_ID        = "your-gcp-project-id"
+        GCP_REGION            = "us-central1"
+        GCP_ARTIFACT_REPO     = "my-etl-repo"
+        SERVICE_ACCOUNT_NAME  = "etl-service-account"
+        GCP_CREDENTIALS_FILE  = "/tmp/gcp-key.json"
+
+        DOCKER_REGISTRY       = "gcr.io/${GCP_PROJECT_ID}"
+
+        IMAGE_UBUNTU          = "${DOCKER_REGISTRY}/ubuntu-etl:latest"
+        IMAGE_ANSIBLE         = "${DOCKER_REGISTRY}/ansible-etl:latest"
+        IMAGE_TERRAFORM       = "${DOCKER_REGISTRY}/terraform:latest"
+
+        TERRAFORM_WORKDIR     = "terraform/envs/${params.ENV}"
+    }
+
+    options {
+        timeout(time: 40, unit: 'MINUTES')
+        ansiColor('xterm')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Authenticate to GCP') {
+            steps {
+                withCredentials([file(credentialsId: 'gcp-service-account-key', variable: 'GCP_KEY')]) {
+                    sh 'cp $GCP_KEY $GCP_CREDENTIALS_FILE'
+                    sh "gcloud auth activate-service-account --key-file=$GCP_CREDENTIALS_FILE"
+                    sh "gcloud config set project ${GCP_PROJECT_ID}"
+                    sh "gcloud auth configure-docker --quiet"
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            when { expression { params.ACTION == 'build_images' } }
+            steps {
+                script {
+                    echo "Building Docker images..."
+
+                    // Ubuntu image
+                    sh "docker build -t ${IMAGE_UBUNTU} -f docker/Dockerfile.ubuntu ."
+
+                    // Ansible image
+                    sh "docker build -t ${IMAGE_ANSIBLE} -f docker/Dockerfile.ansible ."
+
+                    // Terraform image
+                    sh "docker build -t ${IMAGE_TERRAFORM} -f docker/Dockerfile.terraform ."
+                }
+            }
+        }
+
+        stage('Push Docker Images') {
+            when { expression { params.ACTION == 'push_images' } }
+            steps {
+                script {
+                    echo "Pushing Docker images..."
+
+                    sh "docker push ${IMAGE_UBUNTU}"
+                    sh "docker push ${IMAGE_ANSIBLE}"
+                    sh "docker push ${IMAGE_TERRAFORM}"
+                }
+            }
+        }
+
+        stage('Delete Docker Images') {
+            when { expression { params.ACTION == 'delete_images' } }
+            steps {
+                script {
+                    echo "Deleting local Docker images..."
+
+                    def images = [
+                        IMAGE_UBUNTU,
+                        IMAGE_ANSIBLE,
+                        IMAGE_TERRAFORM
+                    ]
+
+                    images.each { image ->
+                        sh "docker rmi ${image} || echo 'Image not found locally: ${image}'"
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Infra') {
+            when { expression { params.ACTION == 'terraform_apply' || params.ACTION == 'terraform_destroy' } }
+            steps {
+                dir("${TERRAFORM_WORKDIR}") {
+                    sh """
+                        docker run --rm -v \$(pwd):/workspace -w /workspace/${TERRAFORM_WORKDIR} \\
+                            -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json \\
+                            -v $GCP_CREDENTIALS_FILE:/tmp/gcp-key.json:ro \\
+                            ${IMAGE_TERRAFORM} init
+                    """
+
+                    script {
+                        def tfCmd = (params.ACTION == 'terraform_apply') ? 'apply -auto-approve' : 'destroy -auto-approve'
+                        sh """
+                            docker run --rm -v \$(pwd):/workspace -w /workspace/${TERRAFORM_WORKDIR} \\
+                                -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json \\
+                                -v $GCP_CREDENTIALS_FILE:/tmp/gcp-key.json:ro \\
+                                ${IMAGE_TERRAFORM} ${tfCmd}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Ansible Setup GCP') {
+            when { expression { params.ACTION == 'setup_gcp' } }
+            steps {
+                sh """
+                    docker run --rm \\
+                        -v \$(pwd)/ansible:/ansible \\
+                        -v \$(pwd)/env:/env \\
+                        -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \\
+                        -e GCP_REGION=${GCP_REGION} \\
+                        -e GCP_ARTIFACT_REPO=${GCP_ARTIFACT_REPO} \\
+                        -e SERVICE_ACCOUNT_NAME=${SERVICE_ACCOUNT_NAME} \\
+                        -e ENV=${params.ENV} \\
+                        ${IMAGE_ANSIBLE} \\
+                        ansible-playbook /ansible/playbook/setup_gcp_resources.yml
+                """
+            }
+        }
+
+        stage('Ansible Decommission GCP') {
+            when { expression { params.ACTION == 'decom_gcp' } }
+            steps {
+                sh """
+                    docker run --rm \\
+                        -v \$(pwd)/ansible:/ansible \\
+                        -v \$(pwd)/env:/env \\
+                        -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \\
+                        -e GCP_REGION=${GCP_REGION} \\
+                        -e GCP_ARTIFACT_REPO=${GCP_ARTIFACT_REPO} \\
+                        -e SERVICE_ACCOUNT_NAME=${SERVICE_ACCOUNT_NAME} \\
+                        -e ENV=${params.ENV} \\
+                        ${IMAGE_ANSIBLE} \\
+                        ansible-playbook /ansible/playbook/decom_gcp_resources.yml
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleaning up credentials..."
+            sh 'rm -f $GCP_CREDENTIALS_FILE'
+        }
+        success {
+            echo "Pipeline succeeded."
+            // Notifications can be added here
+        }
+        failure {
+            echo "Pipeline failed."
+            // Failure notifications can be added here
+        }
+    }
+}

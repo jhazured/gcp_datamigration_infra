@@ -1,29 +1,35 @@
 - name: Decommission GCP Resources
   hosts: localhost
   gather_facts: false
+
   vars:
     sa_email: "{{ service_account_name }}@{{ gcp_project_id }}.iam.gserviceaccount.com"
+
   tasks:
     - name: Delete Artifact Registry (manual step if needed)
       shell: |
         gcloud artifacts repositories delete {{ gcp_artifact_repo }} \
           --location={{ gcp_region }} --project={{ gcp_project_id }} --quiet
       ignore_errors: true
+      changed_when: false
 
     - name: Delete GCS Bucket
       shell: |
         gsutil rm -r gs://{{ gcs_bucket_name }}
       ignore_errors: true
+      changed_when: false
 
     - name: Delete Service Account
       shell: |
         gcloud iam service-accounts delete {{ sa_email }} --quiet --project={{ gcp_project_id }}
       ignore_errors: true
+      changed_when: false
 
-    - name: Delete Secret
+    - name: Delete Secret from Secret Manager
       shell: |
         gcloud secrets delete {{ gcp_credentials_secret_name }} --quiet --project={{ gcp_project_id }}
       ignore_errors: true
+      changed_when: false
 
     - name: Remove local Ubuntu ETL Docker image
       community.docker.docker_image:
@@ -48,3 +54,5 @@
         gcloud artifacts docker images delete
         {{ gcp_region }}-docker.pkg.dev/{{ gcp_project_id }}/{{ gcp_artifact_repo }}/{{ image_name }}:{{ image_tag }}
         --quiet
+      ignore_errors: true
+      changed_when: false

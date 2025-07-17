@@ -1,13 +1,19 @@
-env: dev
+# General variables for all hosts/environments
 
-gcp_project_id: your-gcp-project-id
-gcp_region: asia-southeast1
-gcp_artifact_repo: my-etl-artifacts
-gcs_bucket_name: my-etl-bucket-dev
-gcp_credentials_secret_name: etl-env-secret
-service_account_name: etl-service-account
+gcp_project_id: "your-gcp-project-id"
+gcp_region: "us-central1"
 
-docker_image_name: etl_runner
-docker_tag: dev
-docker_repo: asia-southeast1-docker.pkg.dev/your-gcp-project-id/my-etl-artifacts
+gcp_artifact_repo: "my-etl-repo"
+service_account_name: "etl-service-account"
+gcs_bucket_name: "etl-gcs-bucket"
+
+gcp_credentials_secret_name: "etl-credentials-secret"
+
+docker_repo: "gcr.io/your-gcp-project-id"
+docker_image_name: "etl_image"
+
+docker_tag: "latest"
+
+env: "dev"  # Default environment, override per environment or at runtime
+
 

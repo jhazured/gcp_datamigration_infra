@@ -1,0 +1,58 @@
+services:
+  etl:
+    image: your-registry/ubuntu-etl:latest
+    container_name: etl_app
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account-key.json
+      - GCS_BUCKET=your-real-gcs-bucket-name
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=etl_db
+      - DB_USER=etl_user
+      - DB_PASSWORD=etl_pass
+    volumes:
+      - ./app:/app
+      - ./config:/app/config
+      - ./service-account-key.json:/app/service-account-key.json:ro
+    ports:
+      - "4040:4040"
+      - "8080:8080"
+    depends_on:
+      - db
+
+  ansible:
+    image: your-registry/ansible-etl:latest
+    container_name: ansible_runner
+    volumes:
+      - ./ansible:/ansible
+      - ./service-account-key.json:/ansible/service-account-key.json:ro
+    working_dir: /ansible
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/ansible/service-account-key.json
+    tty: true
+
+  terraform:
+    image: hashicorp/terraform:1.5.7
+    container_name: terraform_runner
+    volumes:
+      - ./terraform:/workspace
+      - ./service-account-key.json:/workspace/service-account-key.json:ro
+    working_dir: /workspace
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/workspace/service-account-key.json
+    tty: true
+
+  db:
+    image: postgres:15
+    container_name: etl_postgres
+    environment:
+      POSTGRES_DB: etl_db
+      POSTGRES_USER: etl_user
+      POSTGRES_PASSWORD: etl_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

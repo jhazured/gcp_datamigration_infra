@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# ETL Project Task Runner for GCP
+# ETL Project Task Runner for GCP (Simplified)
 # Usage: ./run_tasks.sh [task] [options]
-# For build and deploy tasks, you can pass an optional full image tag as 2nd argument
+# Primarily handles pushing local images and cleanup
 
 set -e  # Exit on any error
 
@@ -64,41 +64,6 @@ check_prerequisites() {
     print_success "Prerequisites check passed"
 }
 
-# Build Docker images (optionally with full tag)
-build_docker_images() {
-    local image_tag="${1:-latest}"
-    print_status "Building Docker images with tag: $image_tag"
-    
-    # Ubuntu image
-    if [ -f "docker/Dockerfile.ubuntu" ]; then
-        print_status "Building Ubuntu ETL image..."
-        if [ -f "requirements/prod.txt" ]; then
-            docker build --platform=linux/amd64 -t ${UBUNTU_IMAGE}:${image_tag} \
-                --build-arg REQUIREMENTS_FILE=requirements/prod.txt \
-                -f docker/Dockerfile.ubuntu .
-        else
-            docker build --platform=linux/amd64 -t ${UBUNTU_IMAGE}:${image_tag} -f docker/Dockerfile.ubuntu .
-        fi
-        print_success "Ubuntu image built successfully"
-    fi
-    
-    # Jenkins image
-    if [ -f "docker/Dockerfile.jenkins" ]; then
-        print_status "Building Jenkins image..."
-        docker build --platform=linux/amd64 -t ${JENKINS_IMAGE}:${image_tag} -f docker/Dockerfile.jenkins .
-        print_success "Jenkins image built successfully"
-    fi
-    
-    # Ansible image
-    if [ -f "docker/Dockerfile.ansible" ]; then
-        print_status "Building Ansible image..."
-        docker build --platform=linux/amd64 -t ${ANSIBLE_IMAGE}:${image_tag} -f docker/Dockerfile.ansible .
-        print_success "Ansible image built successfully"
-    fi
-
-    print_success "All Docker images built with tag: $image_tag"
-}
-
 # Deploy Docker images (optionally with full tag)
 deploy_to_gcp() {
     local image_tag="${1:-latest}"
@@ -141,27 +106,21 @@ cleanup() {
 
 # Help message
 show_help() {
-    echo "ETL Project Task Runner"
+    echo "ETL Project Task Runner (Simplified)"
     echo ""
     echo "Usage: ./run_tasks.sh [TASK] [OPTIONAL_IMAGE_TAG]"
     echo ""
     echo "Tasks:"
-    echo "  build [tag]       Build Docker images with optional tag (default: latest)"
     echo "  deploy [tag]      Push Docker images with optional tag (default: latest)"
     echo "  cleanup           Cleanup dangling images and python caches"
     echo "  help              Show this help message"
     echo ""
     echo "Example:"
-    echo "  ./run_tasks.sh build prod-42"
     echo "  ./run_tasks.sh deploy prod-42"
 }
 
 # Main logic
 case "${1:-help}" in
-    build)
-        check_prerequisites
-        build_docker_images "$2"
-        ;;
     deploy)
         check_prerequisites
         deploy_to_gcp "$2"

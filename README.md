@@ -29,7 +29,6 @@ gcp_datamigration_infra/
 │   │   └── localhost.yml
 │   ├── playbook
 │   │   ├── build_and_deploy_images.yml
-│   │   ├── config.yml
 │   │   └── delete_images.yml
 │   ├── requirements.yml
 │   ├── roles
@@ -95,6 +94,7 @@ gcp_datamigration_infra/
             ├── outputs.tf
             └── variables.tf
 ├── makefile
+├── .gitignore
 
 ## Prerequisites
     - Jenkins with Docker and GCP CLI installed.

@@ -8,6 +8,11 @@
     env_file_path: "./env/.env"
     env_template: "templates/.env.j2"
 
+  roles:
+    - env_variables
+    - docker_management
+    - secrets_manager
+
   tasks:
     - name: Retrieve GCP credentials from Secret Manager
       gcp_secret_manager_secret:

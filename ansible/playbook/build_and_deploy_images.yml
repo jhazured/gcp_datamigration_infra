@@ -22,6 +22,10 @@
     - secrets_manager
 
   tasks:
+    - name: Display environment variables for debugging
+      debug:
+        var: env_variables
+
     - name: Build Docker images
       docker_image:
         name: "{{ gcp_registry }}/{{ item.name }}:{{ item.tag }}"

@@ -28,6 +28,7 @@ gcp_datamigration_infra/
 │   ├── inventory
 │   │   └── localhost.yml
 │   ├── playbook
+│   │   ├── init.yml
 │   │   ├── build_and_deploy_images.yml
 │   │   └── delete_images.yml
 │   ├── requirements.yml
@@ -129,24 +130,52 @@ There is one Jenkinsfile used for both infrastructure and Docker image workflows
 
 Jenkinsfile:
 
-Handles the following actions:
+A unified Jenkins pipeline for both infrastructure and Docker image management:
 
-     1. terraform_apply – Create core infrastructure (networks, VMs, artifact registry, service accounts, IAM roles, GCS bucket etc.)
-     2. build_and_deploy_images – Build and push Docker images (Ansible, Terraform, Ubuntu).
-     3. terraform_destroy – Destroy all Terraform-managed infrastructure.
+     1. init – Initialization stage that retrieves secrets and generates environment-specific `.env` files using Ansible. This ensures Docker and runtime containers are correctly configured.
+     2. terraform_apply – Create core infrastructure (networks, VMs, artifact registry, service accounts, IAM roles, GCS bucket etc.)
+     3. build_and_deploy_images – Build and push Docker images (Ansible, Terraform, Ubuntu).
      4. delete_images – Remove local Docker images created by Ansible.
+     5. terraform_destroy – Destroy all Terraform-managed infrastructure.
+
 
 ## Setup Instructions
 
-    1. Configure Jenkins and set up pipelines from jenkins/Jenkinsfile.*
-    2. Add your GCP Service Account JSON key as a Secret file credential in Jenkins with an ID (e.g., gcp-service-account-key).
-    3  Provision infrastructure using terraform_apply
-    4. Build and push Docker images using build_and_deploy_images
-    5. Run your ETL pipeline: 
-        - Set pipeline parameters (ENV, ACTION) on job trigger.
-    6. Tear down resources in this order:
-        - delete_images (Docker cleanup)
-        - terraform_destroy (Terraform teardown)
+     1. Configure Jenkins and load the pipeline from jenkins/Jenkinsfile.
+     2. Add your GCP Service Account JSON key as a Secret file credential in Jenkins with an ID (e.g., gcp-service-account-key).
+     3. Run the following pipeline steps in order:
+            - init
+            - terraform_apply
+            - build_and_deploy_images
+            Teardown:
+            - delete_images
+            - terraform_destroy
+
+## Pipeline Actions
+
+The pipeline consists of four main actions that work together to manage your GCP infrastructure lifecycle:
+
+| ACTION                    | Description                                                  |
+|---------------------------|--------------------------------------------------------------|
+| terraform_apply           | Initialize and apply Terraform configurations to provision core GCP infrastructure resources (networks, VMs, artifact registry, service accounts, IAM roles, GCS bucket etc). |
+| terraform_destroy         | Destroy all Terraform-managed infrastructure resources, cleaning up the core infrastructure created in the initial apply step. |
+| build_and_deploy_images	| Use Ansible to build Docker images for ETL runners and automation tools and push them to the Artifact Registry.
+| delete_images	            | Use Ansible to delete Docker images.
+
+These actions are triggered by Jenkins with parameters:
+
+    - ENV: Target environment (dev, test, uat, prod)
+    - ACTION: Desired action from the table above
+
+### How These Actions Work Together
+
+1. **init** retrieves secrets from GCP Secret Manager and generates your `.env` file using Ansible.
+2. **terraform_apply** runs first to create the base infrastructure required by your application.  
+3. **build_and_deploy_images** follows to configure and deploy docker images to run ETL jobs. 
+4. **delete_images**  to safely remove docker containers managed by Ansible.  
+5. **terraform_destroy** cleans up the remaining core infrastructure managed by Terraform.
+
+This sequence ensures a clean, reliable, and automated lifecycle for your GCP infrastructure, with Terraform handling declarative resource provisioning and Ansible managing procedural orchestration and configuration.
 
 ## Terraform
 
@@ -172,31 +201,6 @@ Ansible is responsible for the configuration management and procedural setup of 
 
 Ansible runs inside the Docker container defined by docker/Dockerfile.ansible.
 
-## Pipeline Actions
-
-The pipeline consists of four main actions that work together to manage your GCP infrastructure lifecycle:
-
-| ACTION                    | Description                                                  |
-|---------------------------|--------------------------------------------------------------|
-| terraform_apply           | Initialize and apply Terraform configurations to provision core GCP infrastructure resources (networks, VMs, artifact registry, service accounts, IAM roles, GCS bucket etc). |
-| terraform_destroy         | Destroy all Terraform-managed infrastructure resources, cleaning up the core infrastructure created in the initial apply step. |
-| build_and_deploy_images	| Use Ansible to build Docker images for ETL runners and automation tools and push them to the Artifact Registry.
-| delete_images	            | Use Ansible to delete Docker images.
-
-These actions are triggered by Jenkins with parameters:
-
-    - ENV: Target environment (dev, test, uat, prod)
-    - ACTION: Desired action from the table above
-
-### How These Actions Work Together
-
-1. **terraform_apply** runs first to create the base infrastructure required by your application.  
-2. **build_and_deploy_images** follows to configure and deploy docker images to run ETL jobs. 
-3. **delete_images**  to safely remove docker containers managed by Ansible.  
-4. **terraform_destroy** cleans up the remaining core infrastructure managed by Terraform.
-
-This sequence ensures a clean, reliable, and automated lifecycle for your GCP infrastructure, with Terraform handling declarative resource provisioning and Ansible managing procedural orchestration and configuration.
-
 ## Docker Images
 
 The following images are built and managed:
@@ -211,7 +215,7 @@ They are built from docker/Dockerfile.* files and tagged/pushed to: gcr.io/<your
 
     - Secrets are stored in GCP Secret Manager
     - Service account keys are injected into Jenkins via withCredentials
-    - Ansible reads environment variables from .env.j2 templates
+    - .env files generated using Ansible and templates/.env.j2
 
 ✅ Best Practices
 
@@ -222,17 +226,20 @@ They are built from docker/Dockerfile.* files and tagged/pushed to: gcr.io/<your
     - Store Terraform state remotely (see backend.tf).
 
 ## Best Practices
-    Secure .env and credential files; avoid committing sensitive data.
-    Use remote state backend for Terraform (configured in backend.tf).
-    Modularize Ansible playbooks into roles for scalability.
-    Regularly rotate service account keys and secrets.
-    Monitor Jenkins logs for pipeline execution details.
+
+    - Use .tfvars and .env files per environment
+    - Run delete_images before terraform_destroy
+    - Keep Jenkins credentials scoped and secure
+    - Dockerize your toolchain for consistency
+    - Store Terraform state remotely (see backend.tf)
+    - Use Ansible roles for maintainable playbooks
+    - Rotate secrets and credentials regularly
 
 ## Troubleshooting
-    Verify GCP permissions and enabled APIs.
-    Test Ansible playbooks locally by running the Docker image interactively.
-    Check Jenkins credential configuration.
-    Confirm Terraform state file consistency.
+    - Check GCP IAM permissions and APIs
+    - Run Ansible tasks interactively in the container
+    - Validate Jenkins credentials and log output
+    - Ensure Terraform state file is not corrupted
 
 ## Contribution
     Feel free to open issues or submit pull requests to improve this project.

@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 PROJECT_NAME="etl-project"
 DOCKER_REGISTRY="gcr.io/$(gcloud config get-value project)"  # Auto-detect GCP project ID via gcloud
 UBUNTU_IMAGE="ubuntu-etl"
-JENKINS_IMAGE="jenkins-etl"
+TERRAFORM_IMAGE="terraform-etl"
 ANSIBLE_IMAGE="ansible-etl"
 
 # Function to print colored messages
@@ -86,7 +86,7 @@ deploy_to_gcp() {
     }
     
     push_image_if_exists "${UBUNTU_IMAGE}:${image_tag}" "${DOCKER_REGISTRY}/${UBUNTU_IMAGE}:${image_tag}"
-    push_image_if_exists "${JENKINS_IMAGE}:${image_tag}" "${DOCKER_REGISTRY}/${JENKINS_IMAGE}:${image_tag}"
+    push_image_if_exists "${TERRAFORM_IMAGE}:${image_tag}" "${DOCKER_REGISTRY}/${TERRAFORM_IMAGE}:${image_tag}"
     push_image_if_exists "${ANSIBLE_IMAGE}:${image_tag}" "${DOCKER_REGISTRY}/${ANSIBLE_IMAGE}:${image_tag}"
     
     print_success "All images deployed to GCP with tag: $image_tag"

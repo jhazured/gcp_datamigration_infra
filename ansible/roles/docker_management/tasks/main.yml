@@ -1,6 +1,6 @@
 - name: Build Docker images for ETL and automation tools
   docker_image:
-    name: "{{ docker_image_name }}"
+    name: "{{ docker_image_name }}:{{ tag }}"
     build:
       path: "{{ docker_file_path }}"
     push: yes

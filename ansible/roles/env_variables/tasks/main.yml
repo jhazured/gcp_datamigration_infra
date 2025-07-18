@@ -7,5 +7,5 @@
   google.cloud.gcp_secret:
     name: "{{ gcp_credentials_secret_name }}"
     data: "{{ lookup('file', './env/.env') }}"
-    project: "{{ gcp_project_id }}"
+    project_id: "{{ gcp_project_id }}"
     state: present

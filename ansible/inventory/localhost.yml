@@ -20,6 +20,9 @@ all:
     # Docker Images
     docker_image_name: "etl-app"
     docker_tag: "{{ ansible_date_time.epoch | default('latest') }}"
+    # Alias for new playbook variables
+    tag: "{{ docker_tag }}"
+    image_tag: "{{ docker_tag }}"
     
     # Storage
     gcs_bucket_name: "my-gcp-project-dev-etl-data"

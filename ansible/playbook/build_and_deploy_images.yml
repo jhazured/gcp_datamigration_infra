@@ -4,6 +4,7 @@
   gather_facts: false
 
   vars:
+    image_tag: "{{ tag | default('latest') }}"
     docker_images:
       - name: "ubuntu-etl"
         path: "docker/Dockerfile.ubuntu"
@@ -27,13 +28,13 @@
     - name: Retrieve GCP credentials from Secret Manager
       gcp_secret_manager_secret:
         name: "{{ gcp_credentials_secret_name }}"
-        project: "{{ gcp_project_id }}"
+        gcp_project_id: "{{ gcp_project_id }}"
         state: present
       register: retrieved_secret
 
     - name: Set secret data as environment variable
       set_fact:
-        secret_data: "{{ retrieved_secret.secret.data | b64decode }}"
+        secret_data: secret_data: "{{ retrieved_secret.secret.data | b64decode | from_json }}"
 
     - name: Generate .env file from template
       template:
@@ -42,7 +43,7 @@
 
     - name: Build Docker images
       docker_image:
-        name: "{{ gcp_registry }}/{{ item.name }}:{{ item.tag }}"
+        name: "{{ gcp_registry }}/{{ item.name }}:{{ image.tag }}"
         path: "{{ item.path }}"
         state: present
       loop: "{{ docker_images }}"
@@ -50,7 +51,7 @@
         loop_var: item
 
     - name: Push Docker images to GCP Artifact Registry
-      command: "docker push {{ gcp_registry }}/{{ item.name }}:{{ item.tag }}"
+      command: "docker push {{ gcp_registry }}/{{ item.name }}:{{ image.tag }}"
       loop: "{{ docker_images }}"
       loop_control:
         loop_var: item

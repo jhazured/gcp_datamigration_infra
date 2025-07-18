@@ -2,5 +2,5 @@
   google.cloud.gcp_secret:
     name: "{{ secret_name }}"
     data: "{{ secret_data }}"
-    project: "{{ gcp_project_id }}"
+    project_id: "{{ gcp_project_id }}"
     state: present

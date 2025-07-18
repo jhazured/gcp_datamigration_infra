@@ -31,7 +31,7 @@
 
     - name: Remove local Docker images
       docker_image:
-        name: "{{ item.name }}:{{ item.tag }}"
+        name: "{{ item.name }}:{{ image.tag }}"
         state: absent
       loop: "{{ docker_images }}"
       loop_control:
@@ -40,13 +40,13 @@
     - name: Delete Docker images from GCP Artifact Registry
       command: >
         gcloud artifacts docker images delete
-        {{ gcp_registry }}/{{ item.name }}:{{ item.tag }} --quiet
+        {{ gcp_registry }}/{{ item.name }}:{{ image.tag }} --quiet
       loop: "{{ docker_images }}"
       loop_control:
         loop_var: item
 
     - name: Confirm Docker images are deleted locally
-      command: docker images -q {{ gcp_registry }}/{{ item.name }}:{{ item.tag }} || echo "Image not found"
+      command: docker images -q {{ gcp_registry }}/{{ item.name }}:{{ image.tag }} || echo "Image not found"
       loop: "{{ docker_images }}"
       loop_control:
         loop_var: item

@@ -48,33 +48,12 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Deploy Docker Images') {
             when { expression { params.ACTION == 'build_and_deploy_images' } }
             steps {
                 script {
-                    echo "Building Docker images..."
-
-                    // Ubuntu image
-                    sh "docker build -t ${IMAGE_UBUNTU} -f docker/Dockerfile.ubuntu ."
-
-                    // Ansible image
-                    sh "docker build -t ${IMAGE_ANSIBLE} -f docker/Dockerfile.ansible ."
-
-                    // Terraform image
-                    sh "docker build -t ${IMAGE_TERRAFORM} -f docker/Dockerfile.terraform ."
-                }
-            }
-        }
-
-        stage('Push Docker Images') {
-            when { expression { params.ACTION == 'build_and_deploy_images' } }
-            steps {
-                script {
-                    echo "Pushing Docker images..."
-
-                    sh "docker push ${IMAGE_UBUNTU}"
-                    sh "docker push ${IMAGE_ANSIBLE}"
-                    sh "docker push ${IMAGE_TERRAFORM}"
+                    echo "Deploying Docker images using deploy_images.sh script..."
+                    sh "./scripts/deploy_images.sh deploy latest"
                 }
             }
         }
@@ -83,17 +62,8 @@ pipeline {
             when { expression { params.ACTION == 'delete_images' } }
             steps {
                 script {
-                    echo "Deleting local Docker images..."
-
-                    def images = [
-                        IMAGE_UBUNTU,
-                        IMAGE_ANSIBLE,
-                        IMAGE_TERRAFORM
-                    ]
-
-                    images.each { image ->
-                        sh "docker rmi ${image} || echo 'Image not found locally: ${image}'"
-                    }
+                    echo "Removing Docker images using remove_images.sh script..."
+                    sh "./scripts/remove_images.sh"
                 }
             }
         }
@@ -104,15 +74,8 @@ pipeline {
                 script {
                     echo "Starting Terraform container..."
 
-                    // Start Terraform container with appropriate action
-                    sh "docker run -d --name terraform-container ${IMAGE_TERRAFORM} ${params.ACTION} -var-file=${TERRAFORM_WORKDIR}/terraform.tfvars"
-
-                    // Wait for the task to finish (e.g., apply or destroy)
-                    sh "docker wait terraform-container"
-
-                    // Stop and remove the container after execution
-                    sh "docker stop terraform-container"
-                    sh "docker rm terraform-container"
+                    // Run Terraform container with appropriate action and var-file
+                    sh "docker run --rm -v ${WORKSPACE}/${TERRAFORM_WORKDIR}:/terraform -w /terraform ${IMAGE_TERRAFORM} ${params.ACTION} -var-file=terraform.tfvars"
                 }
             }
         }
@@ -125,11 +88,9 @@ pipeline {
         }
         success {
             echo "Pipeline succeeded."
-            // Notifications can be added here
         }
         failure {
             echo "Pipeline failed."
-            // Failure notifications can be added here
         }
     }
 }

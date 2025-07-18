@@ -3,38 +3,3 @@ all:
     localhost:
       ansible_connection: local
       ansible_python_interpreter: "{{ ansible_playbook_python }}"
-  vars:
-    # GCP Configuration - Always Free Tier
-    gcp_project_id: "my-gcp-project-dev"
-    gcp_region: "us-central1"
-    gcp_zone: "us-central1-a"
-    gcp_service_account_file: "/tmp/service-account.json"
-    
-    # Environment
-    env: "dev"
-    
-    # Artifact Registry
-    gcp_artifact_repo: "us-central1-docker.pkg.dev/my-gcp-project-dev/etl-artifacts"
-    docker_repo: "us-central1-docker.pkg.dev/my-gcp-project-dev/etl-artifacts"
-    
-    # Docker Images
-    docker_image_name: "etl-app"
-    docker_tag: "{{ ansible_date_time.epoch | default('latest') }}"
-    # Alias for new playbook variables
-    tag: "{{ docker_tag }}"
-    image_tag: "{{ docker_tag }}"
-    
-    # Storage
-    gcs_bucket_name: "my-gcp-project-dev-etl-data"
-    
-    # Service Account
-    service_account_name: "etl-vm-sa"
-    gcp_credentials_secret_name: "etl-service-account-key"
-    
-    # Compute Instance
-    instance_name: "etl-vm-dev"
-    machine_type: "e2-micro"  # Always Free tier
-    
-    # Network
-    network_name: "data-network-dev"
-    subnet_name: "data-subnet-dev"

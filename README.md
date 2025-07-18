@@ -97,6 +97,11 @@ gcp_datamigration_infra/
 ├── makefile
 ├── .gitignore
 
+
+## Sequence Diagram
+
+![GCP Data Migration Infrastructure Sequence Diagram](images/sequence diagram.png)
+
 ## Prerequisites
     - Jenkins with Docker and GCP CLI installed.
     - Google Cloud project with necessary APIs enabled:

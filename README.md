@@ -101,7 +101,8 @@ gcp_datamigration_infra/
 ## Sequence Diagram
 
 GCP Data Migration Infrastructure Sequence Diagram
-<img src="https://github.com/jhazured/gcp_datamigration_infra/raw/main/documentation/images/sequence_diagram.png" alt="Sequence Diagram" width="600"/>
+![Sequence Diagram](https://github.com/jhazured/gcp_datamigration_infra/raw/main/documentation/images/sequence_diagram.png)
+
 
 
 ## Prerequisites

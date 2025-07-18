@@ -1,0 +1,109 @@
+title GCP Data Migration Infrastructure
+
+sequenceDiagram
+    participant Developer
+    participant Jenkins
+    participant Docker
+    participant Ansible
+    participant Terraform
+    participant GCP as GCP Services
+    
+    note over Developer, GCP: Infrastructure Automation Pipeline
+    Developer->>Jenkins: Trigger Pipeline<br/>(ENV + ACTION)
+    
+    note over Jenkins: 1. Bootstrap Authentication
+    Jenkins->>Docker: Start Ansible
+    Docker->>Ansible: Execute bootstrap.yml
+    note over Ansible: Use bootstrap service account key<br/>(pre-configured per environment)
+    Ansible->>GCP: Authenticate with bootstrap SA
+    GCP-->>Ansible: Authentication successful
+    Ansible-->>Jenkins: Bootstrap complete
+    
+    note over Jenkins: 2. Create Base Infrastructure
+    Jenkins->>Docker: Start Terraform
+    Docker->>Terraform: terraform apply -target=base
+    note over Terraform: Create IAM, Secret Manager,<br/>Artifact Registry first
+    Terraform->>GCP: Create base resources<br/>(IAM, Secret Manager, Registry)
+    GCP-->>Terraform: Base resources created
+    Terraform-->>Jenkins: Base infrastructure ready
+    
+    note over Jenkins: 3. Configure Secrets & Auth
+    Jenkins->>Docker: Start Ansible
+    Docker->>Ansible: Execute configure_secrets.yml
+    Ansible->>GCP: Store pipeline secrets in Secret Manager
+    GCP-->>Ansible: Secrets stored
+    Ansible->>GCP: Configure workload identity
+    GCP-->>Ansible: Workload identity configured
+    Ansible-->>Jenkins: Authentication configured
+    
+    note over Jenkins: 4. Create Full Infrastructure
+    Jenkins->>Docker: Start Terraform
+    Docker->>Terraform: terraform apply (full)
+    Terraform->>GCP: Create remaining infrastructure<br/>(VPC, VMs, Storage, networking)
+    GCP-->>Terraform: Full infrastructure created
+    Terraform->>GCP: Verify Artifact Registry accessible
+    GCP-->>Terraform: Registry verified
+    Terraform-->>Jenkins: Infrastructure ready
+    
+    note over Jenkins: 5. Build & Deploy Images
+    Jenkins->>Docker: Start Ansible
+    Docker->>Ansible: Execute build_and_deploy_images.yml
+    Ansible->>GCP: Get deployment secrets
+    GCP-->>Ansible: Secrets retrieved
+    Ansible->>Docker: Build images<br/>(ubuntu-etl, ansible-etl, terraform)
+    Docker-->>Ansible: Images built
+    Ansible->>GCP: Verify registry connectivity
+    GCP-->>Ansible: Registry accessible
+    Ansible->>GCP: Push to Artifact Registry
+    GCP-->>Ansible: Images deployed successfully
+    Ansible-->>Jenkins: Images ready for deployment
+    
+    note over Jenkins: 6. Deploy & Execute ETL
+    Jenkins->>Docker: Start Ansible
+    Docker->>Ansible: Execute deploy_etl.yml
+    Ansible->>GCP: Get runtime secrets
+    GCP-->>Ansible: Runtime secrets retrieved
+    Ansible->>GCP: Deploy containers to compute instances
+    GCP-->>Ansible: Containers deployed
+    Ansible->>GCP: Start data migration jobs
+    GCP->>GCP: Execute ETL processes
+    GCP->>GCP: Process and migrate data
+    GCP-->>Ansible: ETL execution complete
+    Ansible-->>Jenkins: Data migration successful
+    
+    note over Jenkins: 7. Health Check & Validation
+    Jenkins->>Docker: Start Ansible
+    Docker->>Ansible: Execute validate.yml
+    Ansible->>GCP: Verify data migration results
+    GCP-->>Ansible: Validation results
+    alt Validation Failed
+        Ansible-->>Jenkins: Validation failed - trigger rollback
+        Jenkins->>Jenkins: Execute rollback procedures
+    else Validation Passed
+        Ansible-->>Jenkins: Validation successful
+    end
+    
+    note over Jenkins: 8. Cleanup Images (Optional)
+    alt Cleanup Enabled
+        Jenkins->>Docker: Start Ansible
+        Docker->>Ansible: Execute cleanup_images.yml
+        Ansible->>GCP: Remove temporary images
+        GCP-->>Ansible: Images cleaned
+        Ansible-->>Jenkins: Cleanup complete
+    end
+    
+    note over Jenkins: 9. Infrastructure Cleanup
+    alt Destroy Infrastructure
+        Jenkins->>Docker: Start Terraform
+        Docker->>Terraform: terraform destroy
+        Terraform->>GCP: Destroy all resources
+        GCP-->>Terraform: Resources destroyed
+        Terraform-->>Jenkins: Infrastructure cleaned
+    else Keep Infrastructure
+        Jenkins->>Jenkins: Skip destroy (for persistent envs)
+    end
+    
+    Jenkins-->>Developer: Pipeline complete<br/>(Success/Failure status)
+    
+    note over Developer, GCP: Multi-Environment Support: dev/test/uat/prod<br/>Each environment has separate:<br/>- Bootstrap service accounts<br/>- Secret Manager instances<br/>- Artifact Registry repositories<br/>- Resource naming conventions
+

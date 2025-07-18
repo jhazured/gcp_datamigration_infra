@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ETL Project Task Runner for GCP (Simplified)
-# Usage: ./run_tasks.sh [task] [options]
+# Usage: ./deploy_images.sh [task] [options]
 # Primarily handles pushing local images and cleanup
 
 set -e  # Exit on any error
@@ -108,7 +108,7 @@ cleanup() {
 show_help() {
     echo "ETL Project Task Runner (Simplified)"
     echo ""
-    echo "Usage: ./run_tasks.sh [TASK] [OPTIONAL_IMAGE_TAG]"
+    echo "Usage: ./deploy_images.sh [TASK] [OPTIONAL_IMAGE_TAG]"
     echo ""
     echo "Tasks:"
     echo "  deploy [tag]      Push Docker images with optional tag (default: latest)"
@@ -116,7 +116,7 @@ show_help() {
     echo "  help              Show this help message"
     echo ""
     echo "Example:"
-    echo "  ./run_tasks.sh deploy prod-42"
+    echo "  ./deploy_images.sh deploy prod-42"
 }
 
 # Main logic

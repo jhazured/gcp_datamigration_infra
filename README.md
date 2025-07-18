@@ -60,8 +60,8 @@ gcp_datamigration_infra/
 │   ├── test.txt
 │   └── uat.txt
 ├── scripts
-│   ├── delete_etl.sh
-│   └── run_tasks.sh
+│   ├── remove_images.sh
+│   └── deploy_images.sh
 └── terraform
     ├── backend.tf
     ├── envs
@@ -109,6 +109,19 @@ gcp_datamigration_infra/
         - Secret Manager Accessor
         - Compute Admin (if managing compute resources)
     - Jenkins credentials configured to securely store the Service Account JSON key.
+
+## Scripts
+
+The scripts/ directory includes helper scripts used during local development or Jenkins pipeline runs:
+
+        1. deploy_images.sh	
+                - Wrapper script to invoke Ansible playbooks inside a Docker container. 
+                - Supports dynamic environment (ENV) and action (ACTION) parameters for modular task execution. Useful for triggering builds, deploys, or configuration tasks.
+        2. remove_images.sh	
+                - Deletes built Docker images both locally and from GCP Artifact Registry. 
+                - Useful for cleanup operations before destroying infrastructure or to free up storage in CI environments.
+
+These scripts are primarily used by Jenkins or local developers to trigger automated steps consistently without needing to manually execute Docker or Ansible commands.
 
 ## Jenkins Pipelines
 

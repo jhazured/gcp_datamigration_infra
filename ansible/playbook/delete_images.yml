@@ -12,8 +12,23 @@
       - name: "terraform"
         tag: "latest"
     gcp_registry: "gcr.io/{{ gcp_project_id }}"
-  
+    gcp_credentials_secret_name: "gcp-etl-env"  # Name of the secret storing the environment variables
+
   tasks:
+    - name: Retrieve GCP credentials from Secret Manager
+      gcp_secret_manager_secret:
+        name: "{{ gcp_credentials_secret_name }}"
+        project_id: "{{ gcp_project_id }}"
+      register: secret_data
+
+    - name: Set environment variables from retrieved secret
+      set_fact:
+        env_variables: "{{ secret_data.secret_data | from_json }}"
+
+    - name: Display environment variables for debugging
+      debug:
+        var: env_variables
+
     - name: Remove local Docker images
       docker_image:
         name: "{{ item.name }}:{{ item.tag }}"
@@ -26,6 +41,12 @@
       command: >
         gcloud artifacts docker images delete
         {{ gcp_registry }}/{{ item.name }}:{{ item.tag }} --quiet
+      loop: "{{ docker_images }}"
+      loop_control:
+        loop_var: item
+
+    - name: Confirm Docker images are deleted locally
+      command: docker images -q {{ gcp_registry }}/{{ item.name }}:{{ item.tag }} || echo "Image not found"
       loop: "{{ docker_images }}"
       loop_control:
         loop_var: item

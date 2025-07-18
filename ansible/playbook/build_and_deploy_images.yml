@@ -15,12 +15,31 @@
         path: "docker/Dockerfile.terraform"
         tag: "latest"
     gcp_registry: "gcr.io/{{ gcp_project_id }}"
+    secret_name: "my-secret"  # Secret name to retrieve
+    gcp_credentials_secret_name: "gcp-etl-env"
 
   roles:
     - env_variables
     - docker_management
-  
+    - secrets_manager
+
   tasks:
+    - name: Retrieve GCP credentials from Secret Manager
+      gcp_secret_manager_secret:
+        name: "{{ gcp_credentials_secret_name }}"
+        project: "{{ gcp_project_id }}"
+        state: present
+      register: retrieved_secret
+
+    - name: Set secret data as environment variable
+      set_fact:
+        secret_data: "{{ retrieved_secret.secret.data | b64decode }}"
+
+    - name: Generate .env file from template
+      template:
+        src: "templates/.env.j2"
+        dest: "./env/.env"
+
     - name: Build Docker images
       docker_image:
         name: "{{ gcp_registry }}/{{ item.name }}:{{ item.tag }}"
@@ -35,3 +54,4 @@
       loop: "{{ docker_images }}"
       loop_control:
         loop_var: item
+

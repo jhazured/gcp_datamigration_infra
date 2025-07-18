@@ -1,19 +1,42 @@
 # General variables for all hosts/environments
+# Updated for Always Free tier configuration
 
-gcp_project_id: "your-gcp-project-id"
+gcp_project_id: "my-gcp-project-dev"
 gcp_region: "us-central1"
+gcp_zone: "us-central1-a"
 
-gcp_artifact_repo: "my-etl-repo"
-service_account_name: "etl-service-account"
-gcs_bucket_name: "etl-gcs-bucket"
+# Artifact Registry configuration (Always Free tier)
+gcp_artifact_repo: "etl-artifacts"
+artifact_registry_url: "us-central1-docker.pkg.dev"
 
+# Service Account configuration
+service_account_name: "etl-vm-sa"
+service_account_display_name: "ETL VM Service Account"
+
+# GCS Bucket configuration (Always Free tier)
+gcs_bucket_name: "etl-gcs-bucket-dev"
+gcs_bucket_location: "us-central1"
+
+# Secrets configuration
 gcp_credentials_secret_name: "etl-credentials-secret"
 
-docker_repo: "gcr.io/your-gcp-project-id"
+# Docker configuration (using Artifact Registry)
+docker_repo: "us-central1-docker.pkg.dev/my-gcp-project-dev/etl-artifacts"
 docker_image_name: "etl_image"
-
 docker_tag: "latest"
 
+# Environment configuration
 env: "dev"  # Default environment, override per environment or at runtime
+
+# Network configuration
+network_name: "data-network-dev"
+subnet_name: "data-subnet-dev"
+cidr_range: "10.10.0.0/16"
+
+# Compute configuration (Always Free tier)
+instance_name: "etl-vm-dev"
+machine_type: "e2-micro"
+boot_image: "debian-cloud/debian-11"
+disk_size: "30"  # GB - within free tier limits
 
 

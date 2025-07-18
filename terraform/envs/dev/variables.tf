@@ -1,17 +1,71 @@
-variable "project_id" {}
-variable "region" {}
-variable "zone" {}
+variable "project_id" {
+  description = "The GCP project ID"
+  type        = string
+}
 
-variable "network_name" {}
-variable "subnet_name" {}
-variable "cidr_range" {}
+variable "region" {
+  description = "The GCP region"
+  type        = string
+}
 
-variable "repo_name" {}
-variable "repo_format" {}
+variable "zone" {
+  description = "The GCP zone"
+  type        = string
+}
 
-variable "instance_name" {}
-variable "machine_type" {}
-variable "boot_image" {}
-variable "startup_script" {}
-variable "service_account_id" {}
-variable "service_account_display_name" {}
+variable "network_name" {
+  description = "Name of the VPC network"
+  type        = string
+}
+
+variable "subnet_name" {
+  description = "Name of the subnet"
+  type        = string
+}
+
+variable "cidr_range" {
+  description = "CIDR block for the subnet"
+  type        = string
+}
+
+variable "repo_name" {
+  description = "Name of the Artifact Registry repository"
+  type        = string
+}
+
+variable "repo_format" {
+  description = "Format of the Artifact Registry repository"
+  type        = string
+  default     = "DOCKER"
+}
+
+variable "instance_name" {
+  description = "Name of the compute instance"
+  type        = string
+}
+
+variable "machine_type" {
+  description = "Machine type for the compute instance"
+  type        = string
+  default     = "e2-micro"  # Cost-optimized default
+}
+
+variable "boot_image" {
+  description = "Boot image for the compute instance"
+  type        = string
+}
+
+variable "startup_script" {
+  description = "Startup script for the compute instance"
+  type        = string
+}
+
+variable "service_account_id" {
+  description = "Service account ID"
+  type        = string
+}
+
+variable "service_account_display_name" {
+  description = "Service account display name"
+  type        = string
+}

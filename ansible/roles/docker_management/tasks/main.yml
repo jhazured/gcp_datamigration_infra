@@ -1,0 +1,13 @@
+- name: Build Docker images for ETL and automation tools
+  docker_image:
+    name: "{{ docker_image_name }}"
+    build:
+      path: "{{ docker_file_path }}"
+    push: yes
+    source: build
+
+- name: Push Docker images to Artifact Registry
+  shell: |
+    gcloud auth configure-docker --quiet
+    docker push "{{ docker_image_name }}"
+  when: docker_image_push

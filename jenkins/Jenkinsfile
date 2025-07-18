@@ -5,7 +5,6 @@ pipeline {
         choice(name: 'ENV', choices: ['dev', 'test', 'uat', 'prod'], description: 'Target environment')
         choice(name: 'ACTION', choices: [
             'terraform_apply', 'terraform_destroy',
-            'setup_gcp', 'decom_gcp',
             'build_and_deploy_images', 'delete_images'
         ], description: 'Action to perform')
     }
@@ -68,7 +67,7 @@ pipeline {
         }
 
         stage('Push Docker Images') {
-            when { expression { params.ACTION == 'push_images' } }
+            when { expression { params.ACTION == 'build_and_deploy_images' } }
             steps {
                 script {
                     echo "Pushing Docker images..."
@@ -105,53 +104,15 @@ pipeline {
                 script {
                     echo "Starting Terraform container..."
 
-                    // Start Terraform container
-                    sh "docker run -d --name terraform-container ${IMAGE_TERRAFORM} ${params.ACTION}"
+                    // Start Terraform container with appropriate action
+                    sh "docker run -d --name terraform-container ${IMAGE_TERRAFORM} ${params.ACTION} -var-file=${TERRAFORM_WORKDIR}/terraform.tfvars"
 
                     // Wait for the task to finish (e.g., apply or destroy)
                     sh "docker wait terraform-container"
 
-                    // Stop the container after execution
+                    // Stop and remove the container after execution
                     sh "docker stop terraform-container"
                     sh "docker rm terraform-container"
-                }
-            }
-        }
-
-        stage('Ansible Setup GCP') {
-            when { expression { params.ACTION == 'setup_gcp' } }
-            steps {
-                script {
-                    echo "Starting Ansible container..."
-
-                    // Start Ansible container
-                    sh "docker run -d --name ansible-container ${IMAGE_ANSIBLE} ansible-playbook /ansible/playbook/setup_gcp_resources.yml"
-
-                    // Wait for the task to finish
-                    sh "docker wait ansible-container"
-
-                    // Stop the container after execution
-                    sh "docker stop ansible-container"
-                    sh "docker rm ansible-container"
-                }
-            }
-        }
-
-        stage('Ansible Decommission GCP') {
-            when { expression { params.ACTION == 'decom_gcp' } }
-            steps {
-                script {
-                    echo "Starting Ansible container for decommissioning..."
-
-                    // Start Ansible container
-                    sh "docker run -d --name ansible-decom-container ${IMAGE_ANSIBLE} ansible-playbook /ansible/playbook/decom_gcp_resources.yml"
-
-                    // Wait for the task to finish
-                    sh "docker wait ansible-decom-container"
-
-                    // Stop the container after execution
-                    sh "docker stop ansible-decom-container"
-                    sh "docker rm ansible-decom-container"
                 }
             }
         }

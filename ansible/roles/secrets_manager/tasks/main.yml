@@ -1,0 +1,6 @@
+- name: Create secret in GCP Secret Manager
+  google.cloud.gcp_secret:
+    name: "{{ secret_name }}"
+    data: "{{ secret_data }}"
+    project: "{{ gcp_project_id }}"
+    state: present

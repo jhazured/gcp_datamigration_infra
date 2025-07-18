@@ -1,0 +1,37 @@
+---
+- name: Build and Deploy Docker Images
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    docker_images:
+      - name: "ubuntu-etl"
+        path: "docker/Dockerfile.ubuntu"
+        tag: "latest"
+      - name: "ansible-etl"
+        path: "docker/Dockerfile.ansible"
+        tag: "latest"
+      - name: "terraform"
+        path: "docker/Dockerfile.terraform"
+        tag: "latest"
+    gcp_registry: "gcr.io/{{ gcp_project_id }}"
+
+  roles:
+    - env_variables
+    - docker_management
+  
+  tasks:
+    - name: Build Docker images
+      docker_image:
+        name: "{{ gcp_registry }}/{{ item.name }}:{{ item.tag }}"
+        path: "{{ item.path }}"
+        state: present
+      loop: "{{ docker_images }}"
+      loop_control:
+        loop_var: item
+
+    - name: Push Docker images to GCP Artifact Registry
+      command: "docker push {{ gcp_registry }}/{{ item.name }}:{{ item.tag }}"
+      loop: "{{ docker_images }}"
+      loop_control:
+        loop_var: item

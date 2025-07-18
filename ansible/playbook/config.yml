@@ -1,0 +1,16 @@
+- name: Configure GCP resources for ETL pipeline
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    gcp_project_id: "{{ gcp_project_id }}"
+    secret_name: "my-secret"
+    secret_data: "{{ lookup('file', 'secrets/my_secret.json') }}"
+    docker_image_name: "gcr.io/{{ gcp_project_id }}/my_etl_image:latest"
+    docker_file_path: "./docker/Dockerfile.ubuntu"
+    gcp_credentials_secret_name: "gcp-etl-env"
+    
+  roles:
+    - secrets_manager
+    - env_variables
+    - docker_management

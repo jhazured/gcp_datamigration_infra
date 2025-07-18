@@ -1,0 +1,31 @@
+---
+- name: Delete Docker Images
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    docker_images:
+      - name: "ubuntu-etl"
+        tag: "latest"
+      - name: "ansible-etl"
+        tag: "latest"
+      - name: "terraform"
+        tag: "latest"
+    gcp_registry: "gcr.io/{{ gcp_project_id }}"
+  
+  tasks:
+    - name: Remove local Docker images
+      docker_image:
+        name: "{{ item.name }}:{{ item.tag }}"
+        state: absent
+      loop: "{{ docker_images }}"
+      loop_control:
+        loop_var: item
+
+    - name: Delete Docker images from GCP Artifact Registry
+      command: >
+        gcloud artifacts docker images delete
+        {{ gcp_registry }}/{{ item.name }}:{{ item.tag }} --quiet
+      loop: "{{ docker_images }}"
+      loop_control:
+        loop_var: item

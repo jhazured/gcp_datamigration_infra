@@ -1,0 +1,11 @@
+- name: Generate .env file from template
+  template:
+    src: "templates/.env.j2"
+    dest: "./env/.env"
+
+- name: Upload .env to GCP Secret Manager
+  google.cloud.gcp_secret:
+    name: "{{ gcp_credentials_secret_name }}"
+    data: "{{ lookup('file', './env/.env') }}"
+    project: "{{ gcp_project_id }}"
+    state: present

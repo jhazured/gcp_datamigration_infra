@@ -4,12 +4,12 @@
 # =============================================================================
 
 # Project Configuration
-project_id = "my-gcp-project-dev"
-region     = "us-central1"        # Always Free tier region
-zone       = "us-central1-a"      # Always Free tier zone
+project_id = "my-gcp-project-dev"               # GCP Project ID
+region     = "us-central1"                      # Always Free tier region
+zone       = "us-central1-a"                    # Always Free tier zone
 
 # Environment Configuration
-env_suffix = "dev"
+env_suffix  = "dev"
 environment = "development"
 
 # Network Configuration
@@ -19,7 +19,7 @@ cidr_range   = "10.10.0.0/16"
 
 # Enable Private Google Access for cost savings
 enable_private_google_access = true
-enable_flow_logs = false  # Disable for cost savings in dev
+enable_flow_logs             = false  # Disable for cost savings in dev
 
 # Artifact Registry Configuration
 repo_name   = "etl-artifacts"
@@ -45,7 +45,7 @@ service_account_roles = [
   "roles/monitoring.metricWriter"
 ]
 
-# Storage Configuration
+# Storage Configuration (GCS Bucket)
 gcs_bucket_name     = "etl-gcs-bucket-dev"
 gcs_bucket_location = "us-central1"
 gcs_storage_class   = "STANDARD"    # Free tier eligible
@@ -64,11 +64,11 @@ additional_packages = [
   "python3-pip"
 ]
 
-# Startup script template path
+# Path to the startup script template
 startup_script_template = "scripts/startup.sh.tpl"
 
 # Security Configuration
-allow_ssh_from_internet = true    # For dev environment
+allow_ssh_from_internet = true    # For dev environment only
 ssh_source_ranges = ["0.0.0.0/0"] # Restrict this for production
 
 # Firewall rules
@@ -93,7 +93,7 @@ firewall_rules = [
   }
 ]
 
-# Instance Tags
+# Instance Tags for firewall rules
 instance_tags = ["ssh-allowed", "http-allowed", "dev-environment"]
 
 # Labels for resource organization
@@ -105,13 +105,13 @@ common_labels = {
   owner       = "jhazured"
 }
 
-# Monitoring and Logging (minimal for cost savings)
+# Monitoring and Logging Configuration
 enable_monitoring = true
 enable_logging    = true
-log_retention_days = 7  # Short retention for dev
+log_retention_days = 7  # Short retention for dev environment
 
 # Secret Manager Configuration (optional)
-create_secrets = false  # Set to true if you need secret management
+create_secrets = false  # Set to true if you need secret management with GCP Secret Manager
 
 # Backup Configuration (minimal for dev)
 enable_backups = false
@@ -123,20 +123,20 @@ min_replicas = 1
 max_replicas = 1
 
 # Cost Optimization Settings
-preemptible = false  # Set to true for even more cost savings (but instances can be terminated)
-automatic_restart = true
+preemptible        = false  # Set to true for cost savings, instances may be terminated
+automatic_restart   = true
 on_host_maintenance = "MIGRATE"
 
 # Development-specific settings
 enable_serial_console = true
-enable_display = false
-enable_ip_forwarding = false
+enable_display        = false
+enable_ip_forwarding  = false
 
-# Metadata
+# Metadata (for instances)
 metadata = {
-  enable-oslogin = "TRUE"
-  startup-script-url = ""  # Will be populated by template
-  ssh-keys = ""  # Add your SSH public key here if needed
+  enable-oslogin       = "TRUE"
+  startup-script-url   = ""  # This will be populated by template
+  ssh-keys             = ""  # Add your SSH public key here if needed
 }
 
 # Data Migration Specific Configuration

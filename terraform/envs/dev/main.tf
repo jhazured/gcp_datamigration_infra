@@ -30,3 +30,18 @@ module "compute_instance" {
   service_account_id      = var.service_account_id
   service_account_display_name = var.service_account_display_name
 }
+
+output "network_name" {
+  value = module.network.network_name
+  description = "The name of the VPC network created."
+}
+
+output "artifact_registry_url" {
+  value = module.artifact_registry.repo_url
+  description = "The URL of the created Artifact Registry."
+}
+
+output "instance_ip" {
+  value = module.compute_instance.instance_ip
+  description = "The external IP address of the created compute instance."
+}

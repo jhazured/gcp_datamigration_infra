@@ -1,3 +1,8 @@
+resource "google_service_account" "vm_service_account" {
+  account_id   = var.service_account_id
+  display_name = var.service_account_display_name
+}
+
 resource "google_compute_instance" "vm" {
   name         = var.instance_name
   machine_type = var.machine_type
@@ -25,7 +30,7 @@ resource "google_compute_instance" "vm" {
   metadata_startup_script = var.startup_script
 }
 
-resource "google_service_account" "vm_service_account" {
-  account_id   = var.service_account_id
-  display_name = var.service_account_display_name
+output "instance_ip" {
+  value = google_compute_instance.vm.network_interface[0].access_config[0].nat_ip
+  description = "The external IP address of the VM instance."
 }

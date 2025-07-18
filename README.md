@@ -105,14 +105,14 @@ There is one Jenkinsfile used for both infrastructure and Docker image workflows
 
 Jenkinsfile:
 
-    Handles the following actions:
+Handles the following actions:
 
-        terraform_apply – Create core infrastructure (networks, VMs, artifact registry, etc.)
-        terraform_destroy – Destroy all Terraform-managed infrastructure
-        setup_gcp – Run Ansible to set up service accounts, secrets, and IAM roles
-        decom_gcp – Run Ansible to safely decommission GCP resources created by Ansible
-        build_and_deploy_images – Build and push Docker images (Ansible, Terraform, Ubuntu)
-        delete_images – Remove local Docker images from the Jenkins agent
+     1. terraform_apply – Create core infrastructure (networks, VMs, artifact registry, etc.)
+     2. setup_gcp – Run Ansible to set up service accounts, secrets, and IAM roles.
+     3. build_and_deploy_images – Build and push Docker images (Ansible, Terraform, Ubuntu).
+     4. decom_gcp – Run Ansible to safely decommission GCP resources created by Ansible.
+     5. terraform_destroy – Destroy all Terraform-managed infrastructure.
+     6. delete_images – Remove local Docker images from the Jenkins agent.
 
 ## Setup Instructions
 

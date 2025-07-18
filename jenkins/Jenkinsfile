@@ -49,33 +49,33 @@ pipeline {
             }
         }
 
-        stage('Docker Image Management') {
+        stage('Build Docker Images') {
             when { expression { params.ACTION == 'build_and_deploy_images' } }
             steps {
                 script {
-                    echo "Managing Docker images..."
+                    echo "Building Docker images..."
 
-                    // Build images
+                    // Ubuntu image
                     sh "docker build -t ${IMAGE_UBUNTU} -f docker/Dockerfile.ubuntu ."
-                    sh "docker build -t ${IMAGE_ANSIBLE} -f docker/Dockerfile.ansible ."
-                    sh "docker build -t ${IMAGE_TERRAFORM} -f docker/Dockerfile.terraform ."
 
-                    // Push images to GCP Artifact Registry
+                    // Ansible image
+                    sh "docker build -t ${IMAGE_ANSIBLE} -f docker/Dockerfile.ansible ."
+
+                    // Terraform image
+                    sh "docker build -t ${IMAGE_TERRAFORM} -f docker/Dockerfile.terraform ."
+                }
+            }
+        }
+
+        stage('Push Docker Images') {
+            when { expression { params.ACTION == 'push_images' } }
+            steps {
+                script {
+                    echo "Pushing Docker images..."
+
                     sh "docker push ${IMAGE_UBUNTU}"
                     sh "docker push ${IMAGE_ANSIBLE}"
                     sh "docker push ${IMAGE_TERRAFORM}"
-
-                    // Clean up local Docker images
-                    def images = [
-                        IMAGE_UBUNTU,
-                        IMAGE_ANSIBLE,
-                        IMAGE_TERRAFORM
-                    ]
-                    images.each { image ->
-                        sh "docker rmi ${image} || echo 'Image not found locally: ${image}'"
-                    }
-
-                    echo "Docker build and deploy completed!"
                 }
             }
         }
@@ -84,10 +84,17 @@ pipeline {
             when { expression { params.ACTION == 'delete_images' } }
             steps {
                 script {
-                    echo "Deleting Docker images..."
+                    echo "Deleting local Docker images..."
 
-                    // Delete local or remote Docker images
-                    sh "./scripts/delete_etl.sh ${params.ENV} ${params.ENV == 'remote' ? 'remote' : ''}"
+                    def images = [
+                        IMAGE_UBUNTU,
+                        IMAGE_ANSIBLE,
+                        IMAGE_TERRAFORM
+                    ]
+
+                    images.each { image ->
+                        sh "docker rmi ${image} || echo 'Image not found locally: ${image}'"
+                    }
                 }
             }
         }
@@ -95,23 +102,18 @@ pipeline {
         stage('Terraform Infra') {
             when { expression { params.ACTION == 'terraform_apply' || params.ACTION == 'terraform_destroy' } }
             steps {
-                dir("${TERRAFORM_WORKDIR}") {
-                    sh """
-                        docker run --rm -v \$(pwd):/workspace -w /workspace/${TERRAFORM_WORKDIR} \\
-                            -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json \\
-                            -v $GCP_CREDENTIALS_FILE:/tmp/gcp-key.json:ro \\
-                            ${IMAGE_TERRAFORM} init
-                    """
+                script {
+                    echo "Starting Terraform container..."
 
-                    script {
-                        def tfCmd = (params.ACTION == 'terraform_apply') ? 'apply -auto-approve' : 'destroy -auto-approve'
-                        sh """
-                            docker run --rm -v \$(pwd):/workspace -w /workspace/${TERRAFORM_WORKDIR} \\
-                                -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json \\
-                                -v $GCP_CREDENTIALS_FILE:/tmp/gcp-key.json:ro \\
-                                ${IMAGE_TERRAFORM} ${tfCmd}
-                        """
-                    }
+                    // Start Terraform container
+                    sh "docker run -d --name terraform-container ${IMAGE_TERRAFORM} ${params.ACTION}"
+
+                    // Wait for the task to finish (e.g., apply or destroy)
+                    sh "docker wait terraform-container"
+
+                    // Stop the container after execution
+                    sh "docker stop terraform-container"
+                    sh "docker rm terraform-container"
                 }
             }
         }
@@ -119,36 +121,38 @@ pipeline {
         stage('Ansible Setup GCP') {
             when { expression { params.ACTION == 'setup_gcp' } }
             steps {
-                sh """
-                    docker run --rm \\
-                        -v \$(pwd)/ansible:/ansible \\
-                        -v \$(pwd)/env:/env \\
-                        -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \\
-                        -e GCP_REGION=${GCP_REGION} \\
-                        -e GCP_ARTIFACT_REPO=${GCP_ARTIFACT_REPO} \\
-                        -e SERVICE_ACCOUNT_NAME=${SERVICE_ACCOUNT_NAME} \\
-                        -e ENV=${params.ENV} \\
-                        ${IMAGE_ANSIBLE} \\
-                        ansible-playbook /ansible/playbook/setup_gcp_resources.yml
-                """
+                script {
+                    echo "Starting Ansible container..."
+
+                    // Start Ansible container
+                    sh "docker run -d --name ansible-container ${IMAGE_ANSIBLE} ansible-playbook /ansible/playbook/setup_gcp_resources.yml"
+
+                    // Wait for the task to finish
+                    sh "docker wait ansible-container"
+
+                    // Stop the container after execution
+                    sh "docker stop ansible-container"
+                    sh "docker rm ansible-container"
+                }
             }
         }
 
         stage('Ansible Decommission GCP') {
             when { expression { params.ACTION == 'decom_gcp' } }
             steps {
-                sh """
-                    docker run --rm \\
-                        -v \$(pwd)/ansible:/ansible \\
-                        -v \$(pwd)/env:/env \\
-                        -e GCP_PROJECT_ID=${GCP_PROJECT_ID} \\
-                        -e GCP_REGION=${GCP_REGION} \\
-                        -e GCP_ARTIFACT_REPO=${GCP_ARTIFACT_REPO} \\
-                        -e SERVICE_ACCOUNT_NAME=${SERVICE_ACCOUNT_NAME} \\
-                        -e ENV=${params.ENV} \\
-                        ${IMAGE_ANSIBLE} \\
-                        ansible-playbook /ansible/playbook/decom_gcp_resources.yml
-                """
+                script {
+                    echo "Starting Ansible container for decommissioning..."
+
+                    // Start Ansible container
+                    sh "docker run -d --name ansible-decom-container ${IMAGE_ANSIBLE} ansible-playbook /ansible/playbook/decom_gcp_resources.yml"
+
+                    // Wait for the task to finish
+                    sh "docker wait ansible-decom-container"
+
+                    // Stop the container after execution
+                    sh "docker stop ansible-decom-container"
+                    sh "docker rm ansible-decom-container"
+                }
             }
         }
     }

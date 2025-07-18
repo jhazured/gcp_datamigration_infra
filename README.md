@@ -101,7 +101,8 @@ gcp_datamigration_infra/
 ## Sequence Diagram
 
 GCP Data Migration Infrastructure Sequence Diagram
-<img width="842" height="1468" alt="sequence diagram" src="https://github.com/user-attachments/assets/a242922d-1038-4913-bf3f-7bcbfdf02b3b.png" />
+<img src="https://github.com/jhazured/gcp_datamigration_infra/raw/main/documentation/images/sequence%20diagram.png" alt="Sequence Diagram" width="600"/>
+
 
 ## Prerequisites
     - Jenkins with Docker and GCP CLI installed.

@@ -6,7 +6,7 @@ pipeline {
         choice(name: 'ACTION', choices: [
             'terraform_apply', 'terraform_destroy',
             'setup_gcp', 'decom_gcp',
-            'build_images', 'push_images', 'delete_images'
+            'build_and_deploy_images', 'delete_images'
         ], description: 'Action to perform')
     }
 
@@ -49,33 +49,33 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
-            when { expression { params.ACTION == 'build_images' } }
+        stage('Docker Image Management') {
+            when { expression { params.ACTION == 'build_and_deploy_images' } }
             steps {
                 script {
-                    echo "Building Docker images..."
+                    echo "Managing Docker images..."
 
-                    // Ubuntu image
+                    // Build images
                     sh "docker build -t ${IMAGE_UBUNTU} -f docker/Dockerfile.ubuntu ."
-
-                    // Ansible image
                     sh "docker build -t ${IMAGE_ANSIBLE} -f docker/Dockerfile.ansible ."
-
-                    // Terraform image
                     sh "docker build -t ${IMAGE_TERRAFORM} -f docker/Dockerfile.terraform ."
-                }
-            }
-        }
 
-        stage('Push Docker Images') {
-            when { expression { params.ACTION == 'push_images' } }
-            steps {
-                script {
-                    echo "Pushing Docker images..."
-
+                    // Push images to GCP Artifact Registry
                     sh "docker push ${IMAGE_UBUNTU}"
                     sh "docker push ${IMAGE_ANSIBLE}"
                     sh "docker push ${IMAGE_TERRAFORM}"
+
+                    // Clean up local Docker images
+                    def images = [
+                        IMAGE_UBUNTU,
+                        IMAGE_ANSIBLE,
+                        IMAGE_TERRAFORM
+                    ]
+                    images.each { image ->
+                        sh "docker rmi ${image} || echo 'Image not found locally: ${image}'"
+                    }
+
+                    echo "Docker build and deploy completed!"
                 }
             }
         }
@@ -84,17 +84,10 @@ pipeline {
             when { expression { params.ACTION == 'delete_images' } }
             steps {
                 script {
-                    echo "Deleting local Docker images..."
+                    echo "Deleting Docker images..."
 
-                    def images = [
-                        IMAGE_UBUNTU,
-                        IMAGE_ANSIBLE,
-                        IMAGE_TERRAFORM
-                    ]
-
-                    images.each { image ->
-                        sh "docker rmi ${image} || echo 'Image not found locally: ${image}'"
-                    }
+                    // Delete local or remote Docker images
+                    sh "./scripts/delete_etl.sh ${params.ENV} ${params.ENV == 'remote' ? 'remote' : ''}"
                 }
             }
         }

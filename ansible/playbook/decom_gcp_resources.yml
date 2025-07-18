@@ -37,12 +37,6 @@
         tag: latest
         state: absent
 
-    - name: Remove local Jenkins Docker image
-      community.docker.docker_image:
-        name: jenkins-etl
-        tag: latest
-        state: absent
-
     - name: Remove local Ansible Docker image
       community.docker.docker_image:
         name: ansible-etl

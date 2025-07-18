@@ -1,0 +1,30 @@
+---
+- name: Initialize Environment
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    gcp_credentials_secret_name: "gcp-etl-env"    # override as needed
+    env_file_path: "./env/.env"
+    env_template: "templates/.env.j2"
+
+  tasks:
+    - name: Retrieve GCP credentials from Secret Manager
+      gcp_secret_manager_secret:
+        name: "{{ gcp_credentials_secret_name }}"
+        gcp_project_id: "{{ gcp_project_id }}"
+        state: present
+      register: retrieved_secret
+
+    - name: Set secret data as environment variable
+      set_fact:
+        secret_data: "{{ retrieved_secret.secret.data | b64decode | from_json }}"
+
+    - name: Generate .env file from template
+      template:
+        src: "{{ env_template }}"
+        dest: "{{ env_file_path }}"
+      vars:
+        secret_data: "{{ secret_data }}"
+        gcp_project_id: "{{ gcp_project_id }}"
+        env: "{{ env }}"

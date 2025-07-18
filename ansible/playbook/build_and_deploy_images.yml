@@ -1,23 +1,20 @@
----
 - name: Build and Deploy Docker Images
   hosts: localhost
   gather_facts: false
 
   vars:
-    image_tag: "{{ tag | default('latest') }}"
+    tag: "{{ tag | default('latest') }}"
     docker_images:
       - name: "ubuntu-etl"
         path: "docker/Dockerfile.ubuntu"
-        tag: "latest"
+        tag: "{{ tag }}"
       - name: "ansible-etl"
         path: "docker/Dockerfile.ansible"
-        tag: "latest"
+        tag: "{{ tag }}"
       - name: "terraform"
         path: "docker/Dockerfile.terraform"
-        tag: "latest"
+        tag: "{{ tag }}"
     gcp_registry: "gcr.io/{{ gcp_project_id }}"
-    secret_name: "my-secret"  # Secret name to retrieve
-    gcp_credentials_secret_name: "gcp-etl-env"
 
   roles:
     - env_variables
@@ -25,25 +22,9 @@
     - secrets_manager
 
   tasks:
-    - name: Retrieve GCP credentials from Secret Manager
-      gcp_secret_manager_secret:
-        name: "{{ gcp_credentials_secret_name }}"
-        gcp_project_id: "{{ gcp_project_id }}"
-        state: present
-      register: retrieved_secret
-
-    - name: Set secret data as environment variable
-      set_fact:
-        secret_data: secret_data: "{{ retrieved_secret.secret.data | b64decode | from_json }}"
-
-    - name: Generate .env file from template
-      template:
-        src: "templates/.env.j2"
-        dest: "./env/.env"
-
     - name: Build Docker images
       docker_image:
-        name: "{{ gcp_registry }}/{{ item.name }}:{{ image.tag }}"
+        name: "{{ gcp_registry }}/{{ item.name }}:{{ item.tag }}"
         path: "{{ item.path }}"
         state: present
       loop: "{{ docker_images }}"
@@ -51,8 +32,7 @@
         loop_var: item
 
     - name: Push Docker images to GCP Artifact Registry
-      command: "docker push {{ gcp_registry }}/{{ item.name }}:{{ image.tag }}"
+      command: "docker push {{ gcp_registry }}/{{ item.name }}:{{ item.tag }}"
       loop: "{{ docker_images }}"
       loop_control:
         loop_var: item
-

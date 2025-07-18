@@ -4,8 +4,11 @@ pipeline {
     parameters {
         choice(name: 'ENV', choices: ['dev', 'test', 'uat', 'prod'], description: 'Target environment')
         choice(name: 'ACTION', choices: [
-            'terraform_apply', 'terraform_destroy',
-            'build_and_deploy_images', 'delete_images'
+            'init',
+            'build_and_deploy_images',
+            'delete_images',
+            'terraform_apply',
+            'terraform_destroy'
         ], description: 'Action to perform')
     }
 
@@ -26,7 +29,7 @@ pipeline {
     }
 
     options {
-        timeout(time: 40, unit: 'MINUTES')
+        timeout(time: 10, unit: 'MINUTES')
         ansiColor('xterm')
     }
 
@@ -37,45 +40,53 @@ pipeline {
             }
         }
 
-        stage('Authenticate to GCP') {
+        stage('Init') {
+            when { expression { params.ACTION == 'init' || params.ACTION in ['build_and_deploy_images', 'delete_images', 'terraform_apply', 'terraform_destroy'] } }
             steps {
                 withCredentials([file(credentialsId: 'gcp-service-account-key', variable: 'GCP_KEY')]) {
-                    sh 'cp $GCP_KEY $GCP_CREDENTIALS_FILE'
-                    sh "gcloud auth activate-service-account --key-file=$GCP_CREDENTIALS_FILE"
-                    sh "gcloud config set project ${GCP_PROJECT_ID}"
-                    sh "gcloud auth configure-docker --quiet"
+                    script {
+                        sh '''
+                        cp $GCP_KEY $GCP_CREDENTIALS_FILE
+                        gcloud auth activate-service-account --key-file=$GCP_CREDENTIALS_FILE
+                        gcloud config set project ${GCP_PROJECT_ID}
+                        gcloud auth configure-docker --quiet
+
+                        ansible-playbook ansible/playbook/init.yml -e "gcp_project_id=${GCP_PROJECT_ID} env=${params.ENV}"
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Deploy Docker Images') {
+        stage('Build and Deploy Images') {
             when { expression { params.ACTION == 'build_and_deploy_images' } }
             steps {
                 script {
-                    echo "Deploying Docker images using deploy_images.sh script..."
-                    sh "./scripts/deploy_images.sh deploy latest"
+                    sh """
+                    ansible-playbook ansible/playbook/build_and_deploy_images.yml -e "gcp_project_id=${GCP_PROJECT_ID} env=${params.ENV}"
+                    """
                 }
             }
         }
 
-        stage('Delete Docker Images') {
+        stage('Delete Images') {
             when { expression { params.ACTION == 'delete_images' } }
             steps {
                 script {
-                    echo "Removing Docker images using remove_images.sh script..."
-                    sh "./scripts/remove_images.sh"
+                    sh """
+                    ansible-playbook ansible/playbook/delete_images.yml -e "gcp_project_id=${GCP_PROJECT_ID} env=${params.ENV}"
+                    """
                 }
             }
         }
 
-        stage('Terraform Infra') {
+        stage('Terraform Infrastructure') {
             when { expression { params.ACTION == 'terraform_apply' || params.ACTION == 'terraform_destroy' } }
             steps {
                 script {
-                    echo "Starting Terraform container..."
-
-                    // Run Terraform container with appropriate action and var-file
-                    sh "docker run --rm -v ${WORKSPACE}/${TERRAFORM_WORKDIR}:/terraform -w /terraform ${IMAGE_TERRAFORM} ${params.ACTION} -var-file=terraform.tfvars"
+                    sh """
+                    docker run --rm -v ${WORKSPACE}/${TERRAFORM_WORKDIR}:/terraform -w /terraform ${IMAGE_TERRAFORM} ${params.ACTION} -var-file=terraform.tfvars
+                    """
                 }
             }
         }
@@ -83,8 +94,7 @@ pipeline {
 
     post {
         always {
-            echo "Cleaning up credentials..."
-            sh 'rm -f $GCP_CREDENTIALS_FILE'
+            sh "rm -f $GCP_CREDENTIALS_FILE"
         }
         success {
             echo "Pipeline succeeded."
